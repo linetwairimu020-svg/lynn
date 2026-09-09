@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Study, Softly is a simple study planner that makes focused progress feel lighter and more human."
+    />
+    <title>Study, Softly</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <a href="../../index.html" class="brand-link">← Back to portfolio</a>
+          <div class="brand-mark">SS</div>
+        </div>
+        <div class="header-copy">
+          <p class="eyebrow">gentle focus</p>
+          <h1>Study, Softly</h1>
+        </div>
+        <button class="theme-toggle" type="button" aria-pressed="false">
+          <span class="toggle-label">Dark mode</span>
+        </button>
+      </header>
+
+      <main class="planner-layout">
+        <section class="panel panel-main">
+          <div class="panel-head">
+            <div>
+              <p class="section-kicker">Today’s rhythm</p>
+              <h2>One quiet win at a time.</h2>
+            </div>
+            <span id="today-date" class="today-date"></span>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card">
+              <span class="stat-label">Tasks</span>
+              <strong id="task-count">0</strong>
+              <small>planned</small>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Done</span>
+              <strong id="done-count">0</strong>
+              <small>completed</small>
+            </article>
+            <article class="stat-card accent">
+              <span class="stat-label">Focus</span>
+              <strong id="focus-minutes">0m</strong>
+              <small>logged today</small>
+            </article>
+            <article class="stat-card streak-card">
+              <span class="stat-label">Streak</span>
+              <strong id="streak-count">1 day</strong>
+              <small>in a row</small>
+            </article>
+          </div>
+
+          <form id="task-form" class="task-form" autocomplete="off">
+            <div class="input-group">
+              <label for="task-title">Study task</label>
+              <input id="task-title" name="taskTitle" type="text" placeholder="Finish chemistry revision" maxlength="80" required />
+            </div>
+            <div class="input-group narrow">
+              <label for="task-subject">Subject</label>
+              <input id="task-subject" name="taskSubject" type="text" placeholder="Math" maxlength="30" required />
+            </div>
+            <div class="input-group narrow">
+              <label for="task-duration">Minutes</label>
+              <select id="task-duration" name="taskDuration">
+                <option value="15">15</option>
+                <option value="25" selected>25</option>
+                <option value="35">35</option>
+                <option value="50">50</option>
+                <option value="90">90</option>
+              </select>
+            </div>
+            <button type="submit" class="add-button">Add task</button>
+          </form>
+
+          <div class="list-header">
+            <h3>My queue</h3>
+            <button id="clear-completed" class="text-button" type="button">Clear done</button>
+          </div>
+
+          <ul id="task-list" class="task-list" aria-live="polite"></ul>
+        </section>
+
+        <aside class="panel panel-side">
+          <div class="timer-card">
+            <p class="section-kicker">Focus session</p>
+            <div id="timer-display" class="timer-display">25:00</div>
+            <div class="timer-actions">
+              <button id="start-timer" type="button" class="primary-button">Start</button>
+              <button id="pause-timer" type="button" class="secondary-button">Pause</button>
+            </div>
+            <p id="timer-status" class="timer-status">A calm session starts with one deep breath.</p>
+          </div>
+
+          <div class="mood-card">
+            <p class="section-kicker">Today’s energy</p>
+            <div class="mood-options" role="radiogroup" aria-label="Today's energy">
+              <label class="mood-option">
+                <input type="radio" name="mood" value="calm" />
+                <span>Calm</span>
+              </label>
+              <label class="mood-option">
+                <input type="radio" name="mood" value="focused" />
+                <span>Focused</span>
+              </label>
+              <label class="mood-option">
+                <input type="radio" name="mood" value="tired" />
+                <span>Tired</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="smile-card">
+            <p class="section-kicker">Gentle reminder</p>
+            <blockquote>
+              “You do not need to be dramatic to make progress. You just need to keep showing up.”
+            </blockquote>
+          </div>
+
+          <div class="history-link-card">
+            <p class="section-kicker">Study log</p>
+            <a href="history.html" class="history-link">View weekly goals and history</a>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
