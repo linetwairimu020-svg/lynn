@@ -1,0 +1,13 @@
+import Navbar from '../components/Navbar';
+import Hero from '../components/Hero';
+import About from '../components/About';
+import Projects from '../components/Projects';
+import Contact from '../components/Contact';
+import Footer from '../components/Footer';
+import Skills from '../components/Skills';
+import Services from '../components/Services';
+import SocialLinks from '../components/SocialLinks';
+
+export default function Home() {
+  return <div className="portfolio-page"><Navbar links={[{ label: 'Home', href: '#top' }, { label: 'About', href: '#about' }, { label: 'Skills', href: '#skills' }, { label: 'Services', href: '#services' }, { label: 'Projects', href: '#work' }, { label: 'Contact', href: '#contact' }]} /><main><div id="top"><Hero /></div><About /><Skills /><Services /><section className="py-6 journey-section"><div className="container"><div className="row g-5 align-items-center"><div className="col-lg-6"><p className="eyebrow"><span /> The journey</p><h2 className="display-5 serif-title">Still studying,<br /><em>always becoming.</em></h2><p className="text-secondary mt-4">I am building my path one thoughtful project at a time, combining Computer Science foundations with visual storytelling and practical web work.</p></div><div className="col-lg-5 ms-auto"><div className="journey-list"><div><span>2026</span><h3 className="h5">Bachelor of Computer Science</h3><p className="small text-secondary">Zetech University</p></div><div><span>Now</span><h3 className="h5">Building for the web</h3><p className="small text-secondary">Exploring React, e-commerce, APIs, and user-centred design.</p></div></div></div></div></div></section><Projects /><section className="py-6 bg-blush"><div className="container"><div className="row g-4 align-items-center"><div className="col-lg-7"><p className="eyebrow"><span /> Why work with me</p><h2 className="display-5 serif-title">Curious, careful, and <em>easy to work with.</em></h2></div><div className="col-lg-4 ms-auto"><p className="text-secondary">I bring a learner&apos;s energy, a designer&apos;s attention to detail, and a practical instinct for making digital experiences clearer.</p><a className="btn btn-outline-dark" href="#contact">Let&apos;s work together <i className="bi bi-arrow-up-right ms-2" /></a></div></div></div></section><section className="py-5"><div className="container d-flex flex-wrap justify-content-between align-items-center gap-4"><div><p className="eyebrow mb-2"><span /> Find me online</p><h2 className="h3 serif-title mb-0">A few places to say hello.</h2></div><SocialLinks /></div></section><Contact /></main><Footer /></div>;
+}

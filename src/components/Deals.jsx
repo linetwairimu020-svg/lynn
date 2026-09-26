@@ -1,0 +1,3 @@
+export default function Deals() {
+  return <section id="deals" className="py-5 deals-section"><div className="container"><div className="row g-3"><div className="col-md-4"><div className="deal-card deal-yellow"><span>TRADE WEEK</span><strong>10% OFF</strong><p>On selected hand tools.</p></div></div><div className="col-md-4"><div className="deal-card deal-dark"><span>POWER UP</span><strong>20% OFF</strong><p>On selected power tools.</p></div></div><div className="col-md-4"><div className="deal-card deal-red"><span>SALE</span><strong>Site essentials</strong><p>Reliable materials at a better price.</p></div></div></div></div></section>;
+}
