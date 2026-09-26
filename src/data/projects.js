@@ -6,10 +6,10 @@ const projects = [
     technologies: ['React', 'Bootstrap', 'E-commerce'], route: '/bakery',
   },
   {
-    id: 'apex-hardware', number: '02', title: 'APEX Hardware', status: 'Live concept',
-    description: 'A professional Kenyan hardware storefront with searchable products, category browsing, product details, and a persistent cart.',
-    image: 'https://images.unsplash.com/photo-1581147036324-c17ac41d7b4a?auto=format&fit=crop&w=900&q=85',
-    technologies: ['React', 'Router', 'Shopping cart'], route: '/hardware',
+    id: 'haven', number: '02', title: 'Haven', status: 'Coming soon', comingSoon: true,
+    description: 'A quiet, elevated lifestyle concept for thoughtful living, warm interiors, and intentional home essentials.',
+    image: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=85',
+    technologies: ['Brand storytelling', 'UX design', 'Lifestyle'], route: '/haven',
   },
 ];
 
