@@ -56,7 +56,8 @@ async function request(path, options = {}) {
 }
 
 const json = (method, data) => ({ method, body: JSON.stringify(data) });
-const collectionPath = (collection) => `/admin/${collection === 'socialLinks' ? 'social-links' : collection}`;
+const contentName = (collection) => collection === 'socialLinks' ? 'social-links' : collection;
+const collectionPath = (collection) => `/admin/${contentName(collection)}`;
 
 async function requestWithCsrf(path, options) {
   if (!csrfToken) await request('/auth/csrf');
@@ -81,13 +82,17 @@ export const apiService = {
   },
   admin: {
     authorize: () => request('/admin/access'),
+    overview: () => request('/admin/overview'),
+    updateMessage: (id, read) => requestWithCsrf(`/admin/messages/${encodeURIComponent(id)}`, json('PATCH', { read })),
   },
   content: {
     list: (collection) => request(collectionPath(collection)),
+    publicList: (collection) => request(`/content/${contentName(collection)}`),
     create: (collection, item) => requestWithCsrf(collectionPath(collection), json('POST', item)),
     update: (collection, id, item) => requestWithCsrf(`${collectionPath(collection)}/${encodeURIComponent(id)}`, json('PUT', item)),
     updateSingleton: (collection, item) => requestWithCsrf(collectionPath(collection), json('PUT', item)),
     remove: (collection, id) => requestWithCsrf(`${collectionPath(collection)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    removeMessage: (id) => requestWithCsrf(`/admin/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   media: {
     uploadProjectImage: (file) => {

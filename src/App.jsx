@@ -72,7 +72,14 @@ function ContentStoreStatus() {
   const socialLinks = useContent('socialLinks');
   const errors = [...new Set([profile, projects, services, skills, socialLinks].map(({ error }) => error).filter(Boolean))];
   if (!errors.length) return null;
-  return <div className="alert alert-warning m-0 rounded-0" role="alert">Saved preview content could not be read. Default content is shown. {errors.join(' ')}</div>;
+  return <div className="alert alert-warning m-0 rounded-0" role="alert">Some portfolio content could not be loaded from the API; available default content is shown. {errors.join(' ')}</div>;
+}
+
+function ContentStoreStatusGate() {
+  const { pathname, search } = useLocation();
+  const view = new URLSearchParams(search).get('view');
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/') || view === 'admin';
+  return isAdminRoute ? null : <ContentStoreStatus />;
 }
 
 export default function App() {
@@ -80,7 +87,7 @@ export default function App() {
     <>
       <ScrollToTop />
       <PageMetadata />
-      <ContentStoreStatus />
+      <ContentStoreStatusGate />
       <Routes>
         <Route path="/" element={<SharedEntry />} />
         <Route path="/login" element={<AuthPage />} />

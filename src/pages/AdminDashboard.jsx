@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import useContent from '../hooks/useContent';
 import useAuth from '../hooks/useAuth';
 import { logout } from '../services/authService';
-import { getCollection, saveCollection } from '../services/mockContentService';
+import { apiService } from '../services/apiService';
+import { notifyContentChanged } from '../services/contentEvents';
 import { safeExternalUrl } from '../utils/urls';
 
 const navigation = [
@@ -63,10 +64,11 @@ const schemas = {
     title: 'Social links',
     collection: 'socialLinks',
     fields: [
-      { name: 'id', label: 'Platform identifier', required: true },
+      { name: 'platform', label: 'Platform identifier', required: true },
       { name: 'name', label: 'Displayed profile name', required: true },
       { name: 'url', label: 'Confirmed profile URL (leave blank until supplied)', type: 'url' },
       { name: 'icon', label: 'Bootstrap Icon class', required: true },
+      { name: 'enabled', label: 'Show on portfolio', type: 'checkbox' },
     ],
   },
 };
@@ -94,8 +96,6 @@ const objectSchemas = {
 };
 
 const singular = (value) => value.endsWith('s') ? value.slice(0, -1) : value;
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
 function newRecord(fields) {
   return fields.reduce((record, field) => {
     record[field.name] = field.type === 'checkbox' ? false : field.type === 'list' ? [] : '';
@@ -104,24 +104,25 @@ function newRecord(fields) {
 }
 
 function AdminOverview() {
-  const [counts, setCounts] = useState(null);
+  const [overview, setOverview] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    try {
-      setCounts({
-        projects: getCollection('projects').length,
-        services: getCollection('services').length,
-        skills: getCollection('skills').length,
-        messages: getCollection('messages').length,
-      });
-    } catch (readError) {
-      setError(readError.message);
-    }
+    let active = true;
+    apiService.admin.overview()
+      .then((result) => { if (active) setOverview(result); })
+      .catch((requestError) => { if (active) setError(requestError.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
-  return <section><p className="eyebrow"><span /> Admin preview</p><h1 className="h2 serif-title">Content overview</h1><p className="text-secondary">Edit preview content here. Changes are saved only in this browser and are not published to a server.</p>
+
+  return <section><p className="eyebrow"><span /> Admin dashboard</p><h1 className="h2 serif-title">Content overview</h1><p className="text-secondary">Portfolio content and contact messages stored by the backend.</p>
     {error && <p className="alert alert-warning" role="alert">{error}</p>}
-    <div className="row g-3 mt-2">{navigation.slice(1, 5).map(([label, section, icon]) => <div className="col-sm-6 col-xl-3" key={section}><Link className="admin-summary-card" to={adminUrl(section)}><i className={`bi ${icon}`} aria-hidden="true" /><span>{label}</span><strong>{counts?.[label.toLowerCase()] ?? '—'}</strong></Link></div>)}<div className="col-sm-6 col-xl-3"><Link className="admin-summary-card" to={adminUrl('messages')}><i className="bi bi-envelope" aria-hidden="true" /><span>Messages</span><strong>{counts?.messages ?? '—'}</strong></Link></div></div>
-    <div className="preview-notice mt-4"><strong>Server-verified administrator access</strong><p className="small mb-0">Your account and role are verified by the backend. Dashboard content edits are still saved only in this browser and are not published or shared.</p></div>
+    {loading && <p className="text-secondary" role="status">Loading dashboard data…</p>}
+    <div className="row g-3 mt-2">{navigation.slice(1, 5).map(([label, section, icon]) => <div className="col-sm-6 col-xl-3" key={section}><Link className="admin-summary-card" to={adminUrl(section)}><i className={`bi ${icon}`} aria-hidden="true" /><span>{label}</span><strong>{overview?.counts?.[label.toLowerCase()] ?? '—'}</strong></Link></div>)}<div className="col-sm-6 col-xl-3"><Link className="admin-summary-card" to={adminUrl('messages')}><i className="bi bi-envelope" aria-hidden="true" /><span>Messages</span><strong>{overview?.counts?.messages ?? '—'}</strong></Link></div></div>
+    {overview?.recentActivity?.length > 0 && <section className="mt-4" aria-labelledby="recent-activity-heading"><h2 className="h5" id="recent-activity-heading">Recent activity</h2><ul className="list-group">{overview.recentActivity.map((activity) => <li className="list-group-item d-flex justify-content-between gap-3" key={`${activity.type}-${activity.id}`}><span>{activity.type === 'message' ? 'Received message' : `Updated ${activity.type}`}: {activity.label}</span><time className="small text-secondary" dateTime={activity.at}>{new Date(activity.at).toLocaleString()}</time></li>)}</ul></section>}
+    <div className="preview-notice mt-4"><strong>Server-verified administrator access</strong><p className="small mb-0">Dashboard data is saved in private backend JSON files. JSON file storage is intended for development and a single backend process only.</p></div>
   </section>;
 }
 
@@ -147,11 +148,13 @@ function ContentManager({ page }) {
   const config = schemas[page];
   const objectConfig = objectSchemas[page];
   const collection = config?.collection || page;
-  const { content, error: loadError } = useContent(collection);
+  const { content, error: loadError, loading, refresh } = useContent(collection, { admin: true });
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [notice, setNotice] = useState({ kind: '', text: '' });
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     setEditingId(null);
@@ -161,14 +164,54 @@ function ContentManager({ page }) {
   }, [page]);
 
   useEffect(() => {
-    if (objectConfig && content && !draft) setDraft({ ...content });
-  }, [content, draft, objectConfig]);
+    if (objectConfig && !loading && !loadError && content && !draft) setDraft({ ...content });
+  }, [content, draft, loadError, loading, objectConfig]);
 
   const items = Array.isArray(content) ? content : [];
   const filtered = useMemo(() => items.filter((item) => JSON.stringify(item).toLowerCase().includes(search.toLowerCase())), [items, search]);
 
   if (page === 'messages') {
-    return <section><p className="eyebrow"><span /> Inbox</p><h1 className="h2 serif-title">Contact messages</h1>{loadError && <p className="alert alert-warning" role="alert">{loadError}</p>}<div className="empty-state mt-4"><i className="bi bi-inbox" aria-hidden="true" /><h2 className="h5">No messages stored</h2><p className="mb-0">The contact form has no connected backend yet. Messages are not being saved or received by this dashboard.</p></div></section>;
+    const updateMessage = async (item, read) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setBusy(true);
+      setNotice({ kind: '', text: '' });
+      try {
+        await apiService.admin.updateMessage(item.id, read);
+        notifyContentChanged();
+        await refresh().catch(() => {});
+        setNotice({ kind: 'success', text: 'Message status updated.' });
+      } catch (error) {
+        setNotice({ kind: 'error', text: error.message });
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    };
+    const deleteMessage = async (item) => {
+      if (busyRef.current || !window.confirm(`Delete the message "${item.subject}"? This cannot be undone.`)) return;
+      busyRef.current = true;
+      setBusy(true);
+      setNotice({ kind: '', text: '' });
+      try {
+        await apiService.content.removeMessage(item.id);
+        notifyContentChanged();
+        await refresh().catch(() => {});
+        setNotice({ kind: 'success', text: 'Message deleted.' });
+      } catch (error) {
+        setNotice({ kind: 'error', text: error.message });
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    };
+    return <section><p className="eyebrow"><span /> Inbox</p><h1 className="h2 serif-title">Contact messages</h1>
+      {loadError && <p className="alert alert-warning" role="alert">Could not load contact messages: {loadError}</p>}
+      {notice.text && <p className={`alert ${notice.kind === 'error' ? 'alert-warning' : 'alert-success'}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
+      {loading && <p className="text-secondary" role="status">Loading contact messages…</p>}
+      {!loading && !loadError && items.length === 0 && <div className="empty-state mt-4"><i className="bi bi-inbox" aria-hidden="true" /><h2 className="h5">No messages yet</h2><p className="mb-0">Messages submitted through the portfolio contact form will appear here.</p></div>}
+      {!loadError && items.length > 0 && <div className="admin-list mt-4">{[...items].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map((item) => <article className="admin-list-item" key={item.id}><div className="flex-grow-1"><div className="d-flex flex-wrap align-items-center gap-2"><h2 className="h5 mb-0">{item.subject}</h2><span className={`badge ${item.read ? 'text-bg-secondary' : 'text-bg-primary'}`}>{item.read ? 'Read' : 'Unread'}</span></div><p className="small text-secondary mb-2 mt-2">{item.name} · <a href={`mailto:${item.email}`}>{item.email}</a> · <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></p><p className="mb-0 text-break">{item.message}</p></div><div className="d-flex flex-wrap gap-2 align-self-start"><button className="btn btn-sm btn-outline-dark" type="button" disabled={busy} onClick={() => updateMessage(item, !item.read)}>{item.read ? 'Mark unread' : 'Mark read'}</button><button className="btn btn-sm btn-outline-danger" type="button" disabled={busy} onClick={() => deleteMessage(item)}>Delete</button></div></article>)}</div>}
+    </section>;
   }
 
   if (!config && !objectConfig) return <AdminOverview />;
@@ -189,65 +232,86 @@ function ContentManager({ page }) {
     setNotice({ kind: '', text: '' });
   };
 
-  const save = (event) => {
-    event.preventDefault();
+  const runMutation = async (operation, successMessage) => {
+    if (busyRef.current || loading || loadError) return false;
+    busyRef.current = true;
+    setBusy(true);
+    setNotice({ kind: '', text: '' });
     try {
-      if (isObject) {
-        saveCollection(collection, draft);
-      } else {
-        const generatedId = draft.id || slugify(draft.title || draft.name || `${page}-${Date.now()}`);
-        const value = { ...draft, id: generatedId };
-        const next = editingId === '__new__'
-          ? [...items, value]
-          : items.map((item) => (item.id === editingId ? value : item));
-        saveCollection(collection, next);
-      }
+      await operation();
+      notifyContentChanged();
+      await refresh().catch(() => {});
+      setNotice({ kind: 'success', text: successMessage });
+      return true;
+    } catch (error) {
+      setNotice({ kind: 'error', text: error.message });
+      return false;
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (!draft) return;
+    const payload = Object.fromEntries(fields.map(({ name }) => [name, draft[name]]));
+    const saved = await runMutation(
+      () => (isObject
+        ? apiService.content.updateSingleton(collection, payload)
+        : editingId === '__new__'
+          ? apiService.content.create(collection, payload)
+          : apiService.content.update(collection, editingId, payload)),
+      `${title} saved successfully.`,
+    );
+    if (saved) {
       setEditingId(null);
       setDraft(null);
-      setNotice({ kind: 'success', text: `${title} saved to this browser's preview storage.` });
-    } catch (error) {
-      setNotice({ kind: 'error', text: error.message });
     }
   };
 
-  const changePublished = (item) => {
-    try {
-      saveCollection(collection, items.map((entry) => entry.id === item.id ? { ...entry, published: entry.published === false } : entry));
-      setNotice({ kind: 'success', text: `${item.title || item.name} publication state updated in this browser.` });
-    } catch (error) {
-      setNotice({ kind: 'error', text: error.message });
-    }
+  const changeVisibility = (item) => {
+    const fieldName = page === 'social-links' ? 'enabled' : 'published';
+    const fieldsPayload = Object.fromEntries(fields.map(({ name }) => [name, item[name]]));
+    fieldsPayload[fieldName] = item[fieldName] === false;
+    return runMutation(
+      () => apiService.content.update(collection, item.id, fieldsPayload),
+      `${item.title || item.name || item.platform} visibility updated.`,
+    );
   };
 
-  const remove = (item) => {
-    if (!window.confirm(`Delete "${item.title || item.name}" from this browser's preview content?`)) return;
-    try {
-      saveCollection(collection, items.filter((entry) => entry.id !== item.id));
-      setNotice({ kind: 'success', text: 'The preview item was deleted from this browser.' });
-    } catch (error) {
-      setNotice({ kind: 'error', text: error.message });
-    }
+  const remove = async (item) => {
+    if (!window.confirm(`Delete "${item.title || item.name || item.platform}"? This cannot be undone.`)) return;
+    await runMutation(
+      () => apiService.content.remove(collection, item.id),
+      'The content item was deleted.',
+    );
   };
 
   const updateDraft = (name, value) => setDraft((current) => ({ ...current, [name]: value }));
 
   return <section>
-    <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4"><div><p className="eyebrow"><span /> Content management</p><h1 className="h2 serif-title mb-1">{title}</h1><p className="text-secondary mb-0">Mock content is stored in this browser only.</p></div>
-      {!isObject && page !== 'messages' && <button className="btn btn-primary" type="button" onClick={startCreate}><i className="bi bi-plus-lg me-2" aria-hidden="true" />Add {singular(title).toLowerCase()}</button>}
+    <div className="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4"><div><p className="eyebrow"><span /> Content management</p><h1 className="h2 serif-title mb-1">{title}</h1><p className="text-secondary mb-0">Changes are saved to the backend and used by the public portfolio when published.</p></div>
+      {!isObject && <button className="btn btn-primary" type="button" onClick={startCreate} disabled={loading || Boolean(loadError) || busy}><i className="bi bi-plus-lg me-2" aria-hidden="true" />Add {singular(title).toLowerCase()}</button>}
     </div>
-    {loadError && <p className="alert alert-warning" role="alert">Could not load saved preview data: {loadError}</p>}
+    {loadError && <p className="alert alert-warning" role="alert">Could not load backend content: {loadError}</p>}
     {notice.text && <p className={`alert ${notice.kind === 'error' ? 'alert-warning' : 'alert-success'}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
-    {draft && <form className="admin-editor mb-4" onSubmit={save}><div className="d-flex justify-content-between align-items-center mb-3"><h2 className="h5 mb-0">{editingId === '__new__' ? `Add ${singular(title).toLowerCase()}` : `Edit ${singular(title).toLowerCase()}`}</h2><button className="btn-close" type="button" aria-label="Cancel editing" onClick={() => { setDraft(null); setEditingId(null); }} /></div>
+    {loading && <p className="text-secondary" role="status">Loading {title.toLowerCase()}…</p>}
+    {draft && !isObject && !loadError && <form className="admin-editor mb-4" onSubmit={save}><div className="d-flex justify-content-between align-items-center mb-3"><h2 className="h5 mb-0">{editingId === '__new__' ? `Add ${singular(title).toLowerCase()}` : `Edit ${singular(title).toLowerCase()}`}</h2><button className="btn-close" type="button" aria-label="Cancel editing" disabled={busy} onClick={() => { setDraft(null); setEditingId(null); }} /></div>
       {fields.map((field) => <Field key={field.name} field={field} value={draft[field.name]} onChange={(value) => updateDraft(field.name, value)} />)}
-      <button className="btn btn-primary" type="submit">Save preview content</button> <button className="btn btn-outline-secondary" type="button" onClick={() => { setDraft(null); setEditingId(null); }}>Cancel</button>
+      <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button> <button className="btn btn-outline-secondary" type="button" disabled={busy} onClick={() => { setDraft(null); setEditingId(null); }}>Cancel</button>
     </form>}
     {!isObject && <div className="mb-3"><label className="visually-hidden" htmlFor="admin-search">Search {title.toLowerCase()}</label><div className="input-group"><span className="input-group-text"><i className="bi bi-search" aria-hidden="true" /></span><input id="admin-search" className="form-control" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${title.toLowerCase()}`} /></div></div>}
     {isObject
-      ? <form className="admin-editor" onSubmit={save}>{fields.map((field) => <Field key={field.name} field={field} value={draft?.[field.name] ?? content?.[field.name]} onChange={(value) => updateDraft(field.name, value)} />)}<button className="btn btn-primary" type="submit" disabled={!draft}>Save {title.toLowerCase()}</button></form>
-      : filtered.length === 0
-        ? <div className="empty-state"><i className="bi bi-inbox" aria-hidden="true" /><h2 className="h5">{items.length ? 'No matching items' : `No ${title.toLowerCase()} yet`}</h2><p className="mb-0">{items.length ? 'Try another search.' : 'Create a preview item to get started. It will only be saved in this browser.'}</p></div>
-        : <div className="admin-list">{filtered.map((item) => <article className="admin-list-item" key={item.id}><div className="flex-grow-1"><div className="d-flex flex-wrap align-items-center gap-2"><h2 className="h5 mb-0">{item.title || item.name || item.id}</h2>{item.published === false && <span className="badge text-bg-secondary">Unpublished</span>}{page === 'social-links' && !safeExternalUrl(item.url) && <span className="badge text-bg-light">URL not configured</span>}</div><p className="small text-secondary mb-0 mt-2">{item.description || (item.skills || item.technologies || []).join(', ') || item.url || 'No description provided.'}</p></div><div className="d-flex flex-wrap gap-2"><button className="btn btn-sm btn-outline-dark" type="button" onClick={() => startEdit(item, item.id)}>Edit</button>{'published' in item && <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => changePublished(item)}>{item.published === false ? 'Publish' : 'Unpublish'}</button>}<button className="btn btn-sm btn-outline-danger" type="button" onClick={() => remove(item)}>Delete</button></div></article>)}</div>}
-    <p className="small text-secondary mt-4 mb-0"><i className="bi bi-info-circle me-1" aria-hidden="true" />This preview uses browser storage. It is not a persistent database, multi-user system, or production publishing workflow.</p>
+      ? !loading && !loadError && <form className="admin-editor" onSubmit={save}>{fields.map((field) => <Field key={field.name} field={field} value={draft?.[field.name] ?? content?.[field.name]} onChange={(value) => updateDraft(field.name, value)} />)}<button className="btn btn-primary" type="submit" disabled={!draft || busy}>{busy ? 'Saving…' : `Save ${title.toLowerCase()}`}</button></form>
+      : !loading && !loadError && (filtered.length === 0
+        ? <div className="empty-state"><i className="bi bi-inbox" aria-hidden="true" /><h2 className="h5">{items.length ? 'No matching items' : `No ${title.toLowerCase()} yet`}</h2><p className="mb-0">{items.length ? 'Try another search.' : `Create a ${singular(title).toLowerCase()} to get started.`}</p></div>
+        : <div className="admin-list">{filtered.map((item) => {
+          const visibilityField = page === 'social-links' ? 'enabled' : 'published';
+          const isHidden = item[visibilityField] === false;
+          return <article className="admin-list-item" key={item.id}><div className="flex-grow-1"><div className="d-flex flex-wrap align-items-center gap-2"><h2 className="h5 mb-0">{item.title || item.name || item.platform || item.id}</h2>{isHidden && <span className="badge text-bg-secondary">{page === 'social-links' ? 'Disabled' : 'Unpublished'}</span>}{page === 'social-links' && !safeExternalUrl(item.url) && <span className="badge text-bg-light">URL not configured</span>}</div><p className="small text-secondary mb-0 mt-2">{item.description || (item.skills || item.technologies || []).join(', ') || item.url || 'No description provided.'}</p></div><div className="d-flex flex-wrap gap-2"><button className="btn btn-sm btn-outline-dark" type="button" disabled={busy} onClick={() => startEdit(item, item.id)}>Edit</button><button className="btn btn-sm btn-outline-secondary" type="button" disabled={busy} onClick={() => changeVisibility(item)}>{isHidden ? (page === 'social-links' ? 'Enable' : 'Publish') : (page === 'social-links' ? 'Disable' : 'Unpublish')}</button><button className="btn btn-sm btn-outline-danger" type="button" disabled={busy} onClick={() => remove(item)}>Delete</button></div></article>;
+        })}</div>)}
+    <p className="small text-secondary mt-4 mb-0"><i className="bi bi-info-circle me-1" aria-hidden="true" />This JSON-file-backed editor is for local development and a single backend process; it is not a hardened production database.</p>
   </section>;
 }
 

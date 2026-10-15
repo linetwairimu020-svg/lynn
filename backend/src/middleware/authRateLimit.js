@@ -15,3 +15,4 @@ function createLimiter(max, message) {
 
 export const loginRateLimit = createLimiter(10, 'Too many sign-in attempts. Try again in 15 minutes.');
 export const registrationRateLimit = createLimiter(10, 'Too many registration attempts. Try again in 15 minutes.');
+export const contactRateLimit = createLimiter(5, 'Too many contact messages. Try again in 15 minutes.');

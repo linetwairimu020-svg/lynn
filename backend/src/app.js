@@ -6,6 +6,7 @@ import { notFound } from './middleware/notFound.js';
 import healthRouter from './routes/health.routes.js';
 import authRouter from './routes/auth.routes.js';
 import adminRouter from './routes/admin.routes.js';
+import contentRouter from './routes/content.routes.js';
 import { config } from './config/env.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use((error, _request, _response, next) => {
 
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
+app.use('/api', contentRouter);
 app.use('/api/admin', adminRouter);
 app.use(notFound);
 app.use(errorHandler);

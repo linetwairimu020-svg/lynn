@@ -1,29 +1,38 @@
-import { useEffect, useState } from 'react';
-import { getCollection, getDefaultCollection, subscribeToCollection } from '../services/mockContentService';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiService } from '../services/apiService';
+import { getDefaultCollection } from '../services/contentDefaults';
+import { subscribeToContentChanges } from '../services/contentEvents';
 
-export default function useContent(name) {
-  const [initialState] = useState(() => {
+export default function useContent(name, { admin = false } = {}) {
+  const defaults = useMemo(() => getDefaultCollection(name), [name]);
+  const emptyValue = useMemo(() => (Array.isArray(defaults) ? [] : {}), [defaults]);
+  const [content, setContent] = useState(admin ? emptyValue : defaults);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      return { content: getCollection(name), error: '' };
-    } catch (error) {
-      return { content: getDefaultCollection(name), error: error.message };
+      const result = admin
+        ? await apiService.content.list(name)
+        : await apiService.content.publicList(name);
+      setContent(result.content);
+      setError('');
+      return result.content;
+    } catch (readError) {
+      setError(readError.message);
+      if (!admin) setContent(defaults);
+      throw readError;
+    } finally {
+      setLoading(false);
     }
-  });
-  const [content, setContent] = useState(initialState.content);
-  const [error, setError] = useState(initialState.error);
+  }, [admin, defaults, name]);
 
   useEffect(() => {
-    const refresh = () => {
-      try {
-        setContent(getCollection(name));
-        setError('');
-      } catch (readError) {
-        setError(readError.message);
-      }
-    };
-    refresh();
-    return subscribeToCollection(name, refresh);
-  }, [name]);
+    setContent(admin ? emptyValue : defaults);
+    refresh().catch(() => {});
+    return subscribeToContentChanges(() => refresh().catch(() => {}));
+  }, [admin, defaults, emptyValue, refresh]);
 
-  return { content, error };
+  return { content, error, loading, refresh };
 }

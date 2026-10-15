@@ -2,8 +2,9 @@ import app from './app.js';
 import { config } from './config/env.js';
 import { initializeSessionStore } from './services/sessionStore.js';
 import { initializeUserStore } from './services/userStore.js';
+import { initializeContentStore } from './services/contentStore.js';
 
-await Promise.all([initializeUserStore(), initializeSessionStore()]);
+await Promise.all([initializeUserStore(), initializeSessionStore(), initializeContentStore()]);
 
 const server = app.listen(config.port, config.host);
 server.on('listening', () => {
