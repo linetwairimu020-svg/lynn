@@ -1,0 +1,247 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { after, before, test } from 'node:test';
+
+const frontendOrigin = 'http://localhost:5173';
+let dataDir;
+let app;
+let server;
+let baseUrl;
+let userStore;
+let sessionStore;
+let argon2;
+
+async function startServer() {
+  server = createServer(app);
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+}
+
+async function stopServer() {
+  if (server?.listening) {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+}
+
+function updateCookies(jar, response) {
+  for (const cookie of response.headers.getSetCookie()) {
+    const pair = cookie.split(';', 1)[0];
+    const separator = pair.indexOf('=');
+    if (separator < 0) continue;
+    const name = pair.slice(0, separator);
+    const value = pair.slice(separator + 1);
+    if (/Max-Age=0/i.test(cookie)) jar.delete(name);
+    else jar.set(name, value);
+  }
+}
+
+async function request(pathname, jar = new Map(), options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set('Origin', frontendOrigin);
+  if (jar.size) headers.set('Cookie', [...jar].map(([name, value]) => `${name}=${value}`).join('; '));
+  const response = await fetch(`${baseUrl}${pathname}`, { ...options, headers });
+  updateCookies(jar, response);
+  const body = await response.json();
+  return { response, body, jar };
+}
+
+async function csrf(jar) {
+  return request('/api/auth/csrf', jar);
+}
+
+async function postWithCsrf(pathname, body, jar) {
+  if (!jar.has('lynn.csrf')) await csrf(jar);
+  return request(pathname, jar, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': decodeURIComponent(jar.get('lynn.csrf')),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+const newUser = {
+  name: 'Test Lynn User',
+  email: 'Test.User@example.com',
+  password: 'StrongPassword123',
+};
+
+before(async () => {
+  dataDir = await mkdtemp(path.join(os.tmpdir(), 'lynn-auth-tests-'));
+  process.env.DATA_DIR = dataDir;
+  ({ default: app } = await import('../src/app.js'));
+  userStore = await import('../src/services/userStore.js');
+  sessionStore = await import('../src/services/sessionStore.js');
+  argon2 = await import('argon2');
+  await Promise.all([userStore.initializeUserStore(), sessionStore.initializeSessionStore()]);
+  await startServer();
+});
+
+after(async () => {
+  await stopServer();
+  await rm(dataDir, { recursive: true, force: true });
+});
+
+test('initializes empty JSON data files without exposing a public data path', async () => {
+  assert.deepEqual(JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8')), []);
+  assert.deepEqual(JSON.parse(await readFile(path.join(dataDir, 'sessions.json'), 'utf8')), []);
+});
+
+test('registers an ordinary user and returns no credential material', async () => {
+  const result = await postWithCsrf('/api/auth/register', newUser, new Map());
+  assert.equal(result.response.status, 201);
+  assert.deepEqual(Object.keys(result.body.user).sort(), ['createdAt', 'email', 'id', 'name', 'role']);
+  assert.equal(result.body.user.email, newUser.email);
+  assert.equal(result.body.user.role, 'user');
+  const stored = JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8'));
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0].emailNormalized, newUser.email.toLowerCase());
+  assert.match(stored[0].passwordHash, /^\$argon2id\$/);
+  assert.equal(JSON.stringify(stored).includes(newUser.password), false);
+});
+
+test('rejects duplicate normalized email addresses', async () => {
+  const result = await postWithCsrf('/api/auth/register', { ...newUser, email: ' test.user@EXAMPLE.com ' }, new Map());
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.error.code, 'EMAIL_IN_USE');
+});
+
+test('serializes concurrent registrations for the same normalized email', async () => {
+  const details = { ...newUser, email: 'Concurrent.User@example.com' };
+  const results = await Promise.all([
+    postWithCsrf('/api/auth/register', details, new Map()),
+    postWithCsrf('/api/auth/register', { ...details, email: ' concurrent.user@EXAMPLE.com ' }, new Map()),
+  ]);
+  assert.deepEqual(results.map(({ response }) => response.status).sort(), [201, 409]);
+});
+
+test('rejects invalid registration data and public administrator assignment', async () => {
+  const invalid = await postWithCsrf('/api/auth/register', { ...newUser, password: 'weak' }, new Map());
+  assert.equal(invalid.response.status, 400);
+  assert.equal(invalid.body.error.code, 'INVALID_PASSWORD');
+
+  const privilegeEscalation = await postWithCsrf('/api/auth/register', {
+    ...newUser,
+    email: 'other@example.com',
+    role: 'admin',
+  }, new Map());
+  assert.equal(privilegeEscalation.response.status, 400);
+  assert.equal(privilegeEscalation.body.error.code, 'INVALID_REGISTRATION');
+});
+
+test('login uses generic invalid-credential responses and issues HTTP-only session cookies', async () => {
+  const jar = new Map();
+  const invalid = await postWithCsrf('/api/auth/login', { email: newUser.email, password: 'WrongPassword123' }, jar);
+  assert.equal(invalid.response.status, 401);
+  assert.equal(invalid.body.error.message, 'Email or password is incorrect.');
+
+  const result = await postWithCsrf('/api/auth/login', { email: newUser.email.toUpperCase(), password: newUser.password }, jar);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.user.role, 'user');
+  assert.equal(JSON.stringify(result.body).includes('passwordHash'), false);
+  assert.ok(jar.has('lynn.sid'));
+  assert.ok(jar.has('lynn.csrf'));
+  const sessionCookie = result.response.headers.getSetCookie().find((cookie) => cookie.startsWith('lynn.sid='));
+  assert.match(sessionCookie, /HttpOnly/i);
+  assert.match(sessionCookie, /SameSite=Lax/i);
+  assert.match(sessionCookie, /Max-Age=/i);
+  assert.equal(result.response.headers.get('access-control-allow-credentials'), 'true');
+  return { jar };
+});
+
+test('rejects state-changing requests without a matching CSRF token', async () => {
+  const result = await request('/api/auth/logout', new Map(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(result.response.status, 403);
+  assert.equal(result.body.error.code, 'CSRF_INVALID');
+});
+
+test('returns the authenticated user from /me and requires a valid session', async () => {
+  const anonymous = await request('/api/auth/me');
+  assert.equal(anonymous.response.status, 401);
+
+  const loginJar = new Map();
+  await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, loginJar);
+  const authenticated = await request('/api/auth/me', loginJar);
+  assert.equal(authenticated.response.status, 200);
+  assert.equal(authenticated.body.user.email, newUser.email);
+  assert.ok(authenticated.body.csrfToken);
+  assert.equal(JSON.stringify(authenticated.body).includes('passwordHash'), false);
+});
+
+test('denies ordinary users from all admin API paths and allows provisioned administrators', async () => {
+  const ordinaryJar = new Map();
+  await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, ordinaryJar);
+  const denied = await request('/api/admin/access', ordinaryJar);
+  assert.equal(denied.response.status, 403);
+  const deniedUnknownAdmin = await request('/api/admin/projects', ordinaryJar);
+  assert.equal(deniedUnknownAdmin.response.status, 403);
+
+  const adminPassword = 'SecureAdminPassword987';
+  const passwordHash = await argon2.hash(adminPassword, { type: argon2.argon2id });
+  const admin = await userStore.provisionAdmin({
+    name: 'Provisioned Admin',
+    email: 'owner@example.com',
+    password: adminPassword,
+    passwordHash,
+  });
+  const adminJar = new Map();
+  await postWithCsrf('/api/auth/login', { email: admin.email, password: adminPassword }, adminJar);
+  const allowed = await request('/api/admin/access', adminJar);
+  assert.equal(allowed.response.status, 200);
+  assert.equal(allowed.body.user.role, 'admin');
+  assert.equal(JSON.stringify(allowed.body).includes('passwordHash'), false);
+});
+
+test('user and session files preserve a valid login across a backend restart', async () => {
+  const jar = new Map();
+  await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, jar);
+  await stopServer();
+  await startServer();
+  const afterRestart = await request('/api/auth/me', jar);
+  assert.equal(afterRestart.response.status, 200);
+  assert.equal(afterRestart.body.user.email, newUser.email);
+});
+
+test('logout deletes the server session and clears both cookies', async () => {
+  const jar = new Map();
+  await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, jar);
+  const result = await postWithCsrf('/api/auth/logout', {}, jar);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.message, 'Signed out.');
+  assert.equal(jar.has('lynn.sid'), false);
+  assert.equal(jar.has('lynn.csrf'), false);
+  const anonymous = await request('/api/auth/me', jar);
+  assert.equal(anonymous.response.status, 401);
+});
+
+test('refuses to overwrite corrupted user data', async () => {
+  const usersPath = path.join(dataDir, 'users.json');
+  const validContents = await readFile(usersPath, 'utf8');
+  await writeFile(usersPath, '{not json', 'utf8');
+  try {
+    const loginJar = new Map();
+    const token = await csrf(loginJar);
+    const loginResult = await request('/api/auth/login', loginJar, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token.body.csrfToken },
+      body: JSON.stringify({ email: newUser.email, password: newUser.password }),
+    });
+    assert.equal(loginResult.response.status, 500);
+    assert.equal(await readFile(usersPath, 'utf8'), '{not json');
+  } finally {
+    await writeFile(usersPath, validContents, 'utf8');
+  }
+});

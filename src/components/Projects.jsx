@@ -1,6 +1,8 @@
 import ProjectCard from './ProjectCard';
-import projects from '../data/projects';
+import useContent from '../hooks/useContent';
 
 export default function Projects() {
-  return <section id="work" className="py-6 project-section"><div className="container"><div className="row align-items-end g-4 mb-5"><div className="col-lg-7"><p className="eyebrow eyebrow-light"><span /> The next chapter</p><h2 className="display-4 serif-title">Projects in <em>progress.</em></h2></div><div className="col-lg-4 ms-auto"><p className="text-white-50 mb-0">Two thoughtful concepts, shaped around useful experiences and calm, modern living.</p></div></div><div className="row g-4">{projects.map((project) => <div className="col-lg-6" key={project.id}><ProjectCard number={project.number} title={project.title} status={project.status} description={project.description} image={project.image} tags={project.technologies} to={project.route} comingSoon={project.comingSoon} /></div>)}</div></div></section>;
+  const { content: projects, error } = useContent('projects');
+  const publishedProjects = projects.filter((project) => project.published !== false);
+  return <section id="work" className="py-6 project-section"><div className="container"><div className="row align-items-end g-4 mb-5"><div className="col-lg-7"><p className="eyebrow eyebrow-light"><span /> Selected work</p><h2 className="display-4 serif-title">Projects & <em>experiments.</em></h2></div><div className="col-lg-4 ms-auto"><p className="text-white-50 mb-0">A mix of working frontend demos and concepts currently taking shape.</p></div></div>{error && <p className="alert alert-warning" role="status">Showing default projects because preview content could not be loaded.</p>}{publishedProjects.length ? <div className="row g-4">{publishedProjects.map((project) => <div className="col-lg-6" key={project.id}><ProjectCard {...project} tags={project.technologies} to={project.route} /></div>)}</div> : <p className="text-white-50">There are no published projects yet.</p>}</div></section>;
 }
