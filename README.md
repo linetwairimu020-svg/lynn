@@ -30,11 +30,14 @@ A React portfolio and project collection for Lynn, an emerging developer and des
 ## Installation
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
 
 ## Build
+
+Run from `frontend/`:
 
 ```bash
 npm run build
@@ -42,29 +45,32 @@ npm run build
 
 ## Preview
 
+Run from `frontend/`:
+
 ```bash
 npm run preview
 ```
 
 ## Project Structure
 
-- `src/components/`: reusable navigation, portfolio, product, cart, checkout, and layout components
-- `src/pages/`: routed portfolio, bakery, hardware, product details, and not-found pages
-- `src/data/`: project, category, product, and social profile data
-- `src/App.jsx`: application routes
-- `src/App.css`: brand styling and special layouts
-- `src/index.css`: global typography and base styles
-- `assets/`: existing favicon and portfolio assets
+- `frontend/`: React + Vite application, frontend environment file, dependencies, and build output
+- `frontend/src/components/`: reusable navigation, portfolio, product, cart, checkout, and layout components
+- `frontend/src/pages/`: routed portfolio, bakery, hardware, product details, and not-found pages
+- `frontend/src/data/`: project, category, product, and social profile data
+- `frontend/src/App.jsx`: application routes
+- `frontend/assets/`: existing favicon and portfolio assets
+- `backend/`: Express API, backend environment file, PostgreSQL store, and legacy JSON import data
+- `README.md`: project overview and shared setup instructions
 
 ## Social Media
 
-The configured display accounts are centralized in `src/data/socialLinks.js`:
+The configured display accounts are centralized in `frontend/src/data/socialLinks.js`:
 
 - Instagram: `lynrunsit`
 - Facebook: `Linet Nimoh`
 - TikTok: `Maybel`
 
-Account URLs remain blank until Linet supplies the exact verified profile URLs. Search-result URLs are not used as substitutes. Update the social links in the admin preview or `src/data/socialLinks.js`.
+Account URLs remain blank until Linet supplies the exact verified profile URLs. Search-result URLs are not used as substitutes. Update the social links in the admin preview or `frontend/src/data/socialLinks.js`.
 
 ## Contact
 
@@ -86,32 +92,32 @@ Account URLs remain blank until Linet supplies the exact verified profile URLs. 
 
 Login and registration share one two-tab authentication screen available at `/login` and `/register`; either route opens the same screen with the matching tab selected. Successful registration redirects to Login. The public navbar's profile icon menu contains Login and Register; it shows the Admin dashboard link only after the server confirms administrator access. The admin dashboard remains at `/?view=admin` with sections selected using `&section=...`. Old query-style login and registration URLs redirect to the separate routes, while legacy `/admin/...` URLs redirect to the admin view. Authentication uses the backend session; registration creates ordinary accounts only. Admin access is checked by the server. Password reset is not implemented.
 
-The contact form validates and sends messages to the backend for private JSON storage; the admin inbox can read, mark, and delete submissions. The APEX cart is browser-persisted; checkout, payment choices, and order confirmation are demonstrations and do not process a real order.
+The contact form validates and sends messages to the backend for private PostgreSQL storage; the admin inbox can read, mark, and delete submissions. The APEX cart is browser-persisted; checkout, payment choices, and order confirmation are demonstrations and do not process a real order.
 
 ## Backend and authentication
 
-The backend is a separate Express app in `backend/`. It supports health checks, registration, login, logout, current-session lookup, administrator authorization, persistent portfolio content management, a public contact submission endpoint, and a protected admin message inbox. Uploads and password reset are not implemented.
+The backend is a separate Express app in `backend/`. It supports health checks, registration, login, logout, current-session lookup, administrator authorization, persistent PostgreSQL-backed portfolio content management, a public contact submission endpoint, and a protected admin message inbox. Uploads and password reset are not implemented.
 
-Install and run the applications in separate terminals:
+Install and run the applications in separate terminals. Frontend settings belong in `frontend/.env`; PostgreSQL credentials belong only in `backend/.env`.
 
 ```powershell
-# Terminal 1: frontend, from the project root
+# Terminal 1: frontend
+Set-Location .\frontend
 npm install
 npm run dev
 
 # Terminal 2: backend
 Set-Location .\backend
 npm install
-Copy-Item .env.example .env
 npm run dev
 ```
 
-Configure the frontend API URL in root `.env.local` using `.env.example`; the backend configuration is in `backend/.env`, based on `backend/.env.example`. The API uses Argon2id password hashes, opaque HTTP-only SameSite session cookies, persisted server-side sessions, CSRF tokens for state-changing requests, explicit credentialed CORS origins, and rate limits on login and registration.
+Configure the frontend API URL in `frontend/.env` using `frontend/.env.example`. Configure PostgreSQL and backend settings in `backend/.env` using `backend/.env.example`. Do not put database credentials in frontend files: Vite bundles frontend environment variables into browser code. The API uses Argon2id password hashes, opaque HTTP-only SameSite session cookies, persisted server-side sessions, CSRF tokens for state-changing requests, explicit credentialed CORS origins, and rate limits on login and registration.
 
-The JSON files are private backend files under `backend/data/`: `users.json`, `sessions.json`, `projects.json`, `services.json`, `skills.json`, `profile.json`, `social-links.json`, `settings.json`, and `messages.json`. Missing content files are initialized from the existing portfolio content; existing files are validated and never reset during startup. The directory is git-ignored and is never served by Vite. Public portfolio reads include only published content and enabled social links. Public registration cannot assign roles. Provision the first administrator using the documented `npm run provision:admin` command and operator-supplied environment variables. See [`backend/README.md`](./backend/README.md) for endpoints, file locations, limitations, and the migration path.
+Legacy JSON files under `backend/data/` are imported into PostgreSQL on first database initialization; PostgreSQL becomes the runtime source of truth and the old files are not modified. Public portfolio reads include only published content and enabled social links. Public registration cannot assign roles. Promote an existing account with the documented `npm run provision:admin` process, which requires explicit email confirmation, preserves account credentials, revokes sessions, and verifies the role through PostgreSQL. See [`backend/README.md`](./backend/README.md) for database setup, the exact command, and verification steps.
 
-JSON-file storage is for local development and a single backend process only. File writes are serialized within that process, but do not coordinate across multiple workers or servers and do not provide database transactions or robust operational backups. It is not a hardened database or appropriate for a multi-user production deployment or shared network storage. Production needs HTTPS, backups, deployment secret management, monitoring, and a reviewed migration to a transactional database. No database has been added.
+The local PostgreSQL database is the authoritative backend store. Production still needs HTTPS, backups, deployment secret management, monitoring, and a reviewed database deployment configuration.
 
 ## Verification and local development
 
-Run `npm install`, then `npm run dev` to start the Vite development server. Run `npm run build` for the production build and `npm run preview` to serve the built output. This project currently defines no lint or automated test scripts in `package.json`.
+Run frontend commands from `frontend/`: `npm install`, `npm run dev`, `npm run build`, or `npm run preview`. Run `npm test` from `backend/` for the backend test suite.

@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 const backendRoot = fileURLToPath(new URL('../../', import.meta.url));
 
-function parsePort(value) {
+function parsePort(value, name = 'PORT') {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('PORT must be an integer between 1 and 65535.');
+    throw new Error(`${name} must be an integer between 1 and 65535.`);
   }
   return port;
 }
@@ -46,6 +46,22 @@ if (!['development', 'test', 'production'].includes(nodeEnv)) {
   throw new Error('NODE_ENV must be development, test, or production.');
 }
 
+const databaseUrl = process.env.DATABASE_URL?.trim() || '';
+const databaseConfig = nodeEnv === 'test'
+  ? {}
+  : databaseUrl
+    ? { connectionString: databaseUrl }
+    : {
+        host: process.env.PGHOST || '127.0.0.1',
+        port: parsePort(process.env.PGPORT || '5432', 'PGPORT'),
+        database: process.env.PGDATABASE || '',
+        user: process.env.PGUSER || '',
+        password: process.env.PGPASSWORD,
+      };
+if (nodeEnv !== 'test' && !databaseUrl && (!databaseConfig.database || !databaseConfig.user)) {
+  throw new Error('Set DATABASE_URL or PGDATABASE and PGUSER in backend/.env to configure PostgreSQL.');
+}
+
 const host = process.env.HOST || '127.0.0.1';
 if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1' && host !== '0.0.0.0' && host !== '::') {
   throw new Error('HOST must be a hostname or IP address.');
@@ -57,5 +73,6 @@ export const config = Object.freeze({
   port: parsePort(process.env.PORT || '3000'),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173'),
   sessionTtlMs: parseSessionTtl(process.env.SESSION_TTL_HOURS || '8'),
+  databaseConfig,
   dataDir: path.resolve(backendRoot, process.env.DATA_DIR || 'data'),
 });

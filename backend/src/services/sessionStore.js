@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { config } from '../config/env.js';
-import { withJsonArray } from './jsonArrayStore.js';
+import { withDocumentArray } from './documentStore.js';
 
 const FILE_NAME = 'sessions.json';
 
@@ -30,7 +30,7 @@ export async function createSession(userId) {
     csrfToken,
     expiresAt: new Date(Date.now() + config.sessionTtlMs).toISOString(),
   };
-  await withJsonArray(FILE_NAME, validateSessions, async (sessions) => ({
+  await withDocumentArray(FILE_NAME, validateSessions, async (sessions) => ({
     value: undefined,
     records: [...sessions.filter((item) => Date.parse(item.expiresAt) > Date.now()), session],
     changed: true,
@@ -41,7 +41,7 @@ export async function createSession(userId) {
 export async function findSession(token) {
   if (!token || typeof token !== 'string') return null;
   const tokenHash = hashToken(token);
-  return withJsonArray(FILE_NAME, validateSessions, async (sessions) => {
+  return withDocumentArray(FILE_NAME, validateSessions, async (sessions) => {
     const active = sessions.filter((session) => Date.parse(session.expiresAt) > Date.now());
     const session = active.find((item) => item.tokenHash === tokenHash) || null;
     return {
@@ -55,21 +55,21 @@ export async function findSession(token) {
 export async function deleteSession(token) {
   if (!token || typeof token !== 'string') return;
   const tokenHash = hashToken(token);
-  await withJsonArray(FILE_NAME, validateSessions, async (sessions) => {
+  await withDocumentArray(FILE_NAME, validateSessions, async (sessions) => {
     const records = sessions.filter((session) => session.tokenHash !== tokenHash);
     return { value: undefined, records, changed: records.length !== sessions.length };
   });
 }
 
 export async function deleteSessionsForUser(userId) {
-  await withJsonArray(FILE_NAME, validateSessions, async (sessions) => {
+  await withDocumentArray(FILE_NAME, validateSessions, async (sessions) => {
     const records = sessions.filter((session) => session.userId !== userId);
     return { value: undefined, records, changed: records.length !== sessions.length };
   });
 }
 
 export async function initializeSessionStore() {
-  await withJsonArray(FILE_NAME, validateSessions, async (sessions) => {
+  await withDocumentArray(FILE_NAME, validateSessions, async (sessions) => {
     const records = sessions.filter((session) => Date.parse(session.expiresAt) > Date.now());
     return { value: undefined, records, changed: records.length !== sessions.length };
   });

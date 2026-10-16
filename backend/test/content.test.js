@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 
+process.env.NODE_ENV = 'test';
+
 const frontendOrigin = 'http://localhost:5173';
 let dataDir;
 let app;
@@ -96,11 +98,12 @@ before(async () => {
   await startServer();
 
   const adminPassword = 'ContentAdminPassword321';
-  const admin = await userStore.provisionAdmin({
+  const admin = await userStore.createUser({
     name: 'Content Admin',
     email: 'content-admin@example.com',
     passwordHash: await (await import('argon2')).default.hash(adminPassword, { type: 2 }),
   });
+  await userStore.provisionAdmin({ email: admin.email });
   adminJar = new Map();
   await postWithCsrf('/api/auth/login', { email: admin.email, password: adminPassword }, adminJar);
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from '../middleware/errorHandler.js';
-import { withJsonArray } from './jsonArrayStore.js';
+import { withDocumentArray } from './documentStore.js';
 
 const FILE_NAME = 'users.json';
 
@@ -42,21 +42,21 @@ export function toPublicUser(user) {
 
 export async function findUserByEmail(email) {
   const emailNormalized = normalizeEmail(email);
-  return withJsonArray(FILE_NAME, validateUsers, async (users) => ({
+  return withDocumentArray(FILE_NAME, validateUsers, async (users) => ({
     value: users.find((user) => user.emailNormalized === emailNormalized) || null,
     changed: false,
   }));
 }
 
 export async function findUserById(id) {
-  return withJsonArray(FILE_NAME, validateUsers, async (users) => ({
+  return withDocumentArray(FILE_NAME, validateUsers, async (users) => ({
     value: users.find((user) => user.id === id) || null,
     changed: false,
   }));
 }
 
 export async function initializeUserStore() {
-  await withJsonArray(FILE_NAME, validateUsers, async () => ({ value: undefined, changed: false }));
+  await withDocumentArray(FILE_NAME, validateUsers, async () => ({ value: undefined, changed: false }));
 }
 
 function makeUser({ name, email, passwordHash, role = 'user' }) {
@@ -73,7 +73,7 @@ function makeUser({ name, email, passwordHash, role = 'user' }) {
 }
 
 export async function createUser(details) {
-  return withJsonArray(FILE_NAME, validateUsers, async (users) => {
+  return withDocumentArray(FILE_NAME, validateUsers, async (users) => {
     const emailNormalized = normalizeEmail(details.email);
     if (users.some((user) => user.emailNormalized === emailNormalized)) {
       throw new HttpError(409, 'EMAIL_IN_USE', 'An account with that email already exists.');
@@ -83,22 +83,18 @@ export async function createUser(details) {
   });
 }
 
-export async function provisionAdmin(details) {
-  return withJsonArray(FILE_NAME, validateUsers, async (users) => {
-    const emailNormalized = normalizeEmail(details.email);
+export async function provisionAdmin({ email }) {
+  return withDocumentArray(FILE_NAME, validateUsers, async (users) => {
+    const emailNormalized = normalizeEmail(email);
     const existingIndex = users.findIndex((user) => user.emailNormalized === emailNormalized);
     if (existingIndex === -1) {
-      const user = makeUser({ ...details, role: 'admin' });
-      return { value: user, records: [...users, user], changed: true };
+      throw new Error(`No existing account matches ${emailNormalized}; register the account before provisioning it.`);
     }
+
     const existing = users[existingIndex];
-    const updated = {
-      ...existing,
-      name: details.name.trim(),
-      email: details.email.trim(),
-      passwordHash: details.passwordHash,
-      role: 'admin',
-    };
+    if (existing.role === 'admin') return { value: existing, changed: false };
+
+    const updated = { ...existing, role: 'admin' };
     const records = [...users];
     records[existingIndex] = updated;
     return { value: updated, records, changed: true };

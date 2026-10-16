@@ -27,5 +27,5 @@ export default function AdminLink({ className = '', onClick, role }) {
   if (!user || user.role !== 'admin' || authorizedUserId !== user.id) return null;
 
   const isActive = pathname === '/' && new URLSearchParams(search).get('view') === 'admin';
-  return <Link className={`${className}${isActive ? ' active' : ''}`} to="/?view=admin" aria-current={isActive ? 'page' : undefined} onClick={onClick} role={role}>Admin dashboard</Link>;
+  return <Link className={`${className}${isActive ? ' active' : ''}`} to="/?view=admin" aria-current={isActive ? 'page' : undefined} onClick={onClick} role={role}><i className="bi bi-speedometer2" aria-hidden="true" />Admin dashboard</Link>;
 }

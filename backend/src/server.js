@@ -3,6 +3,7 @@ import { config } from './config/env.js';
 import { initializeSessionStore } from './services/sessionStore.js';
 import { initializeUserStore } from './services/userStore.js';
 import { initializeContentStore } from './services/contentStore.js';
+import { closeDocumentStore } from './services/postgresDocumentStore.js';
 
 await Promise.all([initializeUserStore(), initializeSessionStore(), initializeContentStore()]);
 
@@ -17,9 +18,15 @@ server.on('error', (error) => {
 
 function shutdown(signal) {
   console.info(`${signal} received; closing the API server.`);
-  server.close((error) => {
+  server.close(async (error) => {
     if (error) {
       console.error('Error while closing the API server:', error);
+      process.exitCode = 1;
+    }
+    try {
+      await closeDocumentStore();
+    } catch (closeError) {
+      console.error('Error while closing the PostgreSQL connection pool:', closeError);
       process.exitCode = 1;
     }
   });

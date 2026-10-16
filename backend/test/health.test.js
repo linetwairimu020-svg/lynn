@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createServer } from 'node:http';
-import app from '../src/app.js';
 
 let server;
 let baseUrl;
+let app;
 
 before(async () => {
+  process.env.NODE_ENV = 'test';
+  ({ default: app } = await import('../src/app.js'));
   server = createServer(app);
   await new Promise((resolve, reject) => {
     server.once('error', reject);

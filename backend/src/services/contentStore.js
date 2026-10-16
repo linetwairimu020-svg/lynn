@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import defaultProfile from '../../../src/data/profile.js';
-import defaultProjects from '../../../src/data/projects.js';
-import defaultServices from '../../../src/data/services.js';
-import defaultSkills from '../../../src/data/skills.js';
-import defaultSettings from '../../../src/data/settings.js';
-import defaultSocialLinks from '../../../src/data/socialLinks.js';
+import defaultProfile from '../../../frontend/src/data/profile.js';
+import defaultProjects from '../../../frontend/src/data/projects.js';
+import defaultServices from '../../../frontend/src/data/services.js';
+import defaultSkills from '../../../frontend/src/data/skills.js';
+import defaultSettings from '../../../frontend/src/data/settings.js';
+import defaultSocialLinks from '../../../frontend/src/data/socialLinks.js';
 import { HttpError } from '../middleware/errorHandler.js';
-import { withJsonArray, withJsonValue } from './jsonArrayStore.js';
+import { withDocumentArray, withDocumentValue } from './documentStore.js';
 import { validateCollectionInput, validateSingletonInput, validateStoredRecord } from './contentValidation.js';
 
 const arrayDefinitions = {
@@ -70,13 +70,13 @@ function singletonFile(name) {
 
 export async function initializeContentStore() {
   await Promise.all([
-    ...Object.entries(arrayDefinitions).map(([name, definition]) => withJsonArray(
+    ...Object.entries(arrayDefinitions).map(([name, definition]) => withDocumentArray(
       definition.file,
       (records) => validateRecords(name, records),
       async () => ({ value: undefined, changed: false }),
       definition.defaults,
     )),
-    ...Object.entries(singletonDefinitions).map(([name, definition]) => withJsonValue(
+    ...Object.entries(singletonDefinitions).map(([name, definition]) => withDocumentValue(
         definition.file,
         (value) => validateSingleton(name, value),
         definition.defaults,
@@ -87,7 +87,7 @@ export async function initializeContentStore() {
 
 export async function listContent(collection, { publishedOnly = false } = {}) {
   const definition = arrayFile(collection);
-  return withJsonArray(definition.file, (records) => validateRecords(collection, records), async (records) => {
+  return withDocumentArray(definition.file, (records) => validateRecords(collection, records), async (records) => {
     const selected = publishedOnly
       ? records.filter((record) => collection === 'social-links' ? record.enabled !== false : record.published !== false)
       : records;
@@ -104,7 +104,7 @@ export async function createContent(collection, details) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  await withJsonArray(definition.file, (records) => validateRecords(collection, records), async (records) => ({
+  await withDocumentArray(definition.file, (records) => validateRecords(collection, records), async (records) => ({
     value: item,
     records: [...records, item],
     changed: true,
@@ -116,7 +116,7 @@ export async function updateContent(collection, id, details) {
   const definition = arrayFile(collection);
   const value = validateCollectionInput(collection, details);
   let updated;
-  await withJsonArray(definition.file, (records) => validateRecords(collection, records), async (items) => {
+  await withDocumentArray(definition.file, (records) => validateRecords(collection, records), async (items) => {
     const index = items.findIndex((item) => item.id === id);
     if (index < 0) throw new HttpError(404, 'CONTENT_NOT_FOUND', 'The requested content item does not exist.');
     updated = { ...items[index], ...value, updatedAt: new Date().toISOString() };
@@ -129,7 +129,7 @@ export async function updateContent(collection, id, details) {
 
 export async function deleteContent(collection, id) {
   const definition = arrayFile(collection);
-  await withJsonArray(definition.file, (records) => validateRecords(collection, records), async (items) => {
+  await withDocumentArray(definition.file, (records) => validateRecords(collection, records), async (items) => {
     const records = items.filter((item) => item.id !== id);
     if (records.length === items.length) throw new HttpError(404, 'CONTENT_NOT_FOUND', 'The requested content item does not exist.');
     return { value: undefined, records, changed: true };
@@ -137,7 +137,7 @@ export async function deleteContent(collection, id) {
 }
 
 export async function setMessageRead(id, read) {
-  return withJsonArray('messages.json', (records) => validateRecords('messages', records), async (items) => {
+  return withDocumentArray('messages.json', (records) => validateRecords('messages', records), async (items) => {
     const index = items.findIndex((item) => item.id === id);
     if (index < 0) throw new HttpError(404, 'MESSAGE_NOT_FOUND', 'The requested message does not exist.');
     const updated = { ...items[index], read, updatedAt: new Date().toISOString() };
@@ -149,7 +149,7 @@ export async function setMessageRead(id, read) {
 
 export async function getSingleton(name) {
   const definition = singletonFile(name);
-  return withJsonValue(
+  return withDocumentValue(
     definition.file,
     (value) => validateSingleton(name, value),
     definition.defaults,
@@ -160,7 +160,7 @@ export async function getSingleton(name) {
 export async function updateSingleton(name, body) {
   const definition = singletonFile(name);
   const value = validateSingletonInput(name, body);
-  return withJsonValue(
+  return withDocumentValue(
     definition.file,
     (record) => validateSingleton(name, record),
     definition.defaults,
@@ -176,7 +176,7 @@ export async function createContactMessage(details) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  await withJsonArray('messages.json', (records) => validateRecords('messages', records), async (items) => ({
+  await withDocumentArray('messages.json', (records) => validateRecords('messages', records), async (items) => ({
     value: message,
     records: [...items, message],
     changed: true,

@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+
+process.env.NODE_ENV = 'test';
 
 const frontendOrigin = 'http://localhost:5173';
+const execFileAsync = promisify(execFile);
+const provisioningScript = fileURLToPath(new URL('../scripts/provision-admin.js', import.meta.url));
 let dataDir;
 let app;
 let server;
@@ -181,7 +188,7 @@ test('returns the authenticated user from /me and requires a valid session', asy
   assert.equal(JSON.stringify(authenticated.body).includes('passwordHash'), false);
 });
 
-test('denies ordinary users from all admin API paths and allows provisioned administrators', async () => {
+test('denies ordinary users and safely provisions an existing account without changing credentials', async () => {
   const ordinaryJar = new Map();
   await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, ordinaryJar);
   const denied = await request('/api/admin/access', ordinaryJar);
@@ -191,15 +198,48 @@ test('denies ordinary users from all admin API paths and allows provisioned admi
 
   const adminPassword = 'SecureAdminPassword987';
   const passwordHash = await argon2.hash(adminPassword, { type: argon2.argon2id });
-  const admin = await userStore.provisionAdmin({
+  const existingAdminAccount = await userStore.createUser({
     name: 'Provisioned Admin',
     email: 'owner@example.com',
-    password: adminPassword,
     passwordHash,
   });
+  const originalAdminAccount = { ...existingAdminAccount };
   const adminJar = new Map();
-  await postWithCsrf('/api/auth/login', { email: admin.email, password: adminPassword }, adminJar);
-  const allowed = await request('/api/admin/access', adminJar);
+  await postWithCsrf('/api/auth/login', { email: existingAdminAccount.email, password: adminPassword }, adminJar);
+  const beforeProvisioning = await request('/api/auth/me', adminJar);
+  assert.equal(beforeProvisioning.response.status, 200);
+
+  const runProvisioning = async (email, confirmedEmail) => {
+    try {
+      return await execFileAsync(process.execPath, [provisioningScript], {
+        cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
+        env: { ...process.env, DATA_DIR: dataDir, ADMIN_EMAIL: email, ADMIN_EMAIL_CONFIRM: confirmedEmail },
+      });
+    } catch (error) {
+      throw new Error(error.stderr || error.message);
+    }
+  };
+  await assert.rejects(runProvisioning('owner@example.com', 'other@example.com'), /ADMIN_EMAIL_CONFIRM/);
+  await assert.rejects(runProvisioning('missing@example.com', 'missing@example.com'), /No existing account matches/);
+
+  const { stdout } = await runProvisioning(' OWNER@EXAMPLE.COM ', 'owner@example.com');
+  assert.match(stdout, /Administrator role verified/);
+  const storedUsers = JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8'));
+  const promotedUsers = storedUsers.filter((user) => user.emailNormalized === 'owner@example.com');
+  assert.equal(promotedUsers.length, 1);
+  assert.deepEqual(
+    Object.fromEntries(['id', 'name', 'email', 'emailNormalized', 'passwordHash', 'createdAt'].map((key) => [key, promotedUsers[0][key]])),
+    Object.fromEntries(['id', 'name', 'email', 'emailNormalized', 'passwordHash', 'createdAt'].map((key) => [key, originalAdminAccount[key]])),
+  );
+  assert.equal(promotedUsers[0].role, 'admin');
+  assert.equal(JSON.stringify(storedUsers).includes(adminPassword), false);
+
+  const revokedSession = await request('/api/auth/me', adminJar);
+  assert.equal(revokedSession.response.status, 401);
+
+  const refreshedAdminJar = new Map();
+  await postWithCsrf('/api/auth/login', { email: existingAdminAccount.email, password: adminPassword }, refreshedAdminJar);
+  const allowed = await request('/api/admin/access', refreshedAdminJar);
   assert.equal(allowed.response.status, 200);
   assert.equal(allowed.body.user.role, 'admin');
   assert.equal(JSON.stringify(allowed.body).includes('passwordHash'), false);

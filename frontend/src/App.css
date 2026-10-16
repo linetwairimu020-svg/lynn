@@ -12,11 +12,11 @@ body { background: var(--cream); color: var(--ink); }
 .brand-image { border-radius: .55rem; height: 2.5rem; object-fit: contain; width: 2.5rem; }
 .navbar { background: transparent; position: relative; z-index: 2; } .navbar .nav-link { font-size: .86rem; font-weight: 600; }
 .navbar .nav-link.active { color: var(--coral); }
-.profile-menu { position: relative; }
+.profile-menu { margin-right: 1rem; position: relative; }
 .profile-menu-trigger { align-items: center; background: transparent; border: 0; border-radius: 50%; color: var(--plum); display: inline-flex; font-size: 1.45rem; justify-content: center; padding: .3rem; }
 .profile-menu-trigger:hover, .profile-menu-trigger:focus-visible, .profile-menu-trigger.active { color: var(--coral); }
 .profile-menu-items { background: #fff; border: 1px solid rgba(55,29,53,.12); border-radius: .75rem; box-shadow: 0 .75rem 1.5rem rgba(55,29,53,.14); min-width: 12rem; padding: .4rem; position: absolute; right: 0; top: calc(100% + .45rem); z-index: 10; }
-.profile-menu-item { background: transparent; border: 0; border-radius: .45rem; color: var(--ink); display: block; font-size: .9rem; padding: .55rem .75rem; text-decoration: none; width: 100%; }
+.profile-menu-item { align-items: center; background: transparent; border: 0; border-radius: .45rem; color: var(--ink); display: flex; font-size: .9rem; gap: .55rem; padding: .55rem .75rem; text-decoration: none; width: 100%; }
 .profile-menu-item:hover, .profile-menu-item:focus-visible, .profile-menu-item.active { background: var(--cream); color: var(--coral); }
 .profile-menu-trigger:focus-visible, .profile-menu-item:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .hardware-page .navbar .nav-link.active { color: var(--hardware-accent) !important; }
