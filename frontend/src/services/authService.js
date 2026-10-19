@@ -4,6 +4,11 @@ const listeners = new Set();
 let snapshot = { user: null, loading: true, error: '' };
 let authGeneration = 0;
 
+export function isBackendUnavailable(error) {
+  return error instanceof Error
+    && error.message === 'Could not reach the server. Check your connection and try again.';
+}
+
 function notify() {
   listeners.forEach((listener) => listener());
 }

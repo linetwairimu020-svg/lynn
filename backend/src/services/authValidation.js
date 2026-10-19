@@ -4,12 +4,16 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateRegistration(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)
-    || Object.keys(body).some((key) => !['name', 'email', 'password'].includes(key))) {
-    throw new HttpError(400, 'INVALID_REGISTRATION', 'Provide only a name, email, and password.');
+    || Object.keys(body).some((key) => !['name', 'email', 'password', 'phone'].includes(key))) {
+    throw new HttpError(400, 'INVALID_REGISTRATION', 'Provide a name, email, password, and optional phone number.');
+  }
+  if (body.phone !== undefined && typeof body.phone !== 'string') {
+    throw new HttpError(400, 'INVALID_PHONE', 'Enter a valid phone number.');
   }
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   const password = typeof body.password === 'string' ? body.password : '';
+  const phone = body.phone?.trim() || '';
   if (name.length < 2 || name.length > 120) {
     throw new HttpError(400, 'INVALID_NAME', 'Name must be between 2 and 120 characters.');
   }
@@ -20,7 +24,10 @@ export function validateRegistration(body) {
     || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
     throw new HttpError(400, 'INVALID_PASSWORD', 'Use 12 to 128 characters, including uppercase, lowercase, and a number.');
   }
-  return { name, email, password };
+  if (phone && (phone.length > 30 || !/^\+?[0-9\s().-]{7,29}$/.test(phone) || phone.replace(/\D/g, '').length < 7)) {
+    throw new HttpError(400, 'INVALID_PHONE', 'Enter a valid phone number.');
+  }
+  return { name, email, password, ...(phone ? { phone } : {}) };
 }
 
 export function validateLogin(body) {

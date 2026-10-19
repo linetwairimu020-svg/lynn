@@ -79,7 +79,8 @@ function ContentStoreStatusGate() {
   const { pathname, search } = useLocation();
   const view = new URLSearchParams(search).get('view');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/') || view === 'admin';
-  return isAdminRoute ? null : <ContentStoreStatus />;
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
+  return isAdminRoute || isAuthRoute ? null : <ContentStoreStatus />;
 }
 
 export default function App() {

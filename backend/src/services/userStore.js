@@ -17,6 +17,7 @@ function validateUsers(users) {
       || typeof user.name !== 'string' || !user.name
       || typeof user.email !== 'string' || !user.email
       || typeof user.emailNormalized !== 'string' || !user.emailNormalized
+      || (user.phone !== undefined && (typeof user.phone !== 'string' || !user.phone))
       || typeof user.passwordHash !== 'string' || !user.passwordHash
       || !['user', 'admin'].includes(user.role)
       || typeof user.createdAt !== 'string'
@@ -59,13 +60,14 @@ export async function initializeUserStore() {
   await withDocumentArray(FILE_NAME, validateUsers, async () => ({ value: undefined, changed: false }));
 }
 
-function makeUser({ name, email, passwordHash, role = 'user' }) {
+function makeUser({ name, email, phone, passwordHash, role = 'user' }) {
   const emailNormalized = normalizeEmail(email);
   return {
     id: randomUUID(),
     name: name.trim(),
     email: email.trim(),
     emailNormalized,
+    ...(phone ? { phone: phone.trim() } : {}),
     passwordHash,
     role,
     createdAt: new Date().toISOString(),

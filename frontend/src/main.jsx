@@ -6,6 +6,7 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './index.css';
 import './App.css';
+import 'react-phone-input-2/lib/style.css';
 import App from './App';
 
 createRoot(document.getElementById('root')).render(

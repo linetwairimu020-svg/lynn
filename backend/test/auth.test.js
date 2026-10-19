@@ -104,16 +104,28 @@ test('initializes empty JSON data files without exposing a public data path', as
 });
 
 test('registers an ordinary user and returns no credential material', async () => {
-  const result = await postWithCsrf('/api/auth/register', newUser, new Map());
+  const result = await postWithCsrf('/api/auth/register', { ...newUser, phone: '+1 (555) 123-4567' }, new Map());
   assert.equal(result.response.status, 201);
   assert.deepEqual(Object.keys(result.body.user).sort(), ['createdAt', 'email', 'id', 'name', 'role']);
   assert.equal(result.body.user.email, newUser.email);
   assert.equal(result.body.user.role, 'user');
+  assert.equal('phone' in result.body.user, false);
   const stored = JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8'));
   assert.equal(stored.length, 1);
   assert.equal(stored[0].emailNormalized, newUser.email.toLowerCase());
+  assert.equal(stored[0].phone, '+1 (555) 123-4567');
   assert.match(stored[0].passwordHash, /^\$argon2id\$/);
   assert.equal(JSON.stringify(stored).includes(newUser.password), false);
+});
+
+test('rejects invalid optional phone numbers during registration', async () => {
+  const result = await postWithCsrf('/api/auth/register', { ...newUser, email: 'invalid.phone@example.com', phone: 'call me maybe' }, new Map());
+  assert.equal(result.response.status, 400);
+  assert.equal(result.body.error.code, 'INVALID_PHONE');
+
+  const invalidType = await postWithCsrf('/api/auth/register', { ...newUser, email: 'invalid.phone-type@example.com', phone: 12345678 }, new Map());
+  assert.equal(invalidType.response.status, 400);
+  assert.equal(invalidType.body.error.code, 'INVALID_PHONE');
 });
 
 test('rejects duplicate normalized email addresses', async () => {

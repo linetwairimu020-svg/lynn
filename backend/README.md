@@ -63,7 +63,7 @@ Invoke-RestMethod http://127.0.0.1:3000/api/health
 ## Authentication endpoints
 
 - `GET /api/auth/csrf` issues a synchronizer token for state-changing requests.
-- `POST /api/auth/register` creates an ordinary user account only.
+- `POST /api/auth/register` creates an ordinary user account only; an optional phone number is stored privately and excluded from public user responses.
 - `POST /api/auth/login` verifies credentials and sets a session cookie.
 - `GET /api/auth/me` returns safe public fields for the active session.
 - `POST /api/auth/logout` removes the session and clears the cookies.
@@ -124,7 +124,7 @@ SELECT document_key FROM lynn_documents ORDER BY document_key;
 
 ## Admin dashboard scope
 
-Use `/login` and `/register` in the frontend for the shared two-tab authentication screen; each route selects its corresponding tab. After successful registration, the app redirects to the Login tab. The admin dashboard remains at `/?view=admin`; optional sections use `/?view=admin&section=projects` (and `services`, `skills`, `profile`, `social-links`, `messages`, or `settings`). In the public navbar, Login and Register are inside the profile icon menu; the Admin link appears there only after the server confirms administrator access. Legacy query-style login and registration URLs redirect to the separate routes, and old `/admin/...` paths redirect to the admin view.
+Use `/login` and `/register` for the standalone authentication views. Registration collects a first and last name, email, optional phone number, and password; the combined name is stored on the user record, and the optional phone number is kept private. The admin dashboard remains at `/?view=admin`; optional sections use `/?view=admin&section=projects` (and `services`, `skills`, `profile`, `social-links`, `messages`, or `settings`). Legacy query-style login and registration URLs redirect to the separate routes, and old `/admin/...` paths redirect to the admin view.
 
 The admin route checks the current server-backed user and calls the protected admin access endpoint. Dashboard collection and singleton edits, visibility toggles, deletes, and the contact inbox use the protected API. Public portfolio components fetch server content; successful admin changes refresh same-tab and other open tabs. When the backend is unavailable, public components can display the bundled defaults, but administrator editing reports the API error and does not save to browser storage. Existing edits previously saved only in the browser are not automatically imported; when no corresponding legacy JSON file exists, the backend initializes portfolio content from the current source-controlled defaults. Contact messages are stored privately; password reset and media uploads are not implemented.
 
