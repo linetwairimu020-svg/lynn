@@ -17,5 +17,8 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "pg": "^8.23.1"
+  },
+  "allowScripts": {
+    "argon2@0.44.0": true
   }
 }
