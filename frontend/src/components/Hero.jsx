@@ -1,5 +1,6 @@
 import SocialLinks from './SocialLinks';
 import useContent from '../hooks/useContent';
+import portraitImage from '../../assets/Intense Braided Bun Studio Portrait.png';
 
 export default function Hero() {
   const { content: profile } = useContent('profile');
@@ -18,9 +19,9 @@ export default function Hero() {
             <div className="d-flex flex-wrap align-items-center gap-4 small text-secondary"><span>Based in {profile.location}</span><span>•</span><span>Open to learning</span><SocialLinks compact /></div>
           </div>
           <div className="col-lg-5">
-            <div className="hero-art shadow-lg" role="img" aria-label="Linet Wairimu monogram illustration">
+            <div className="hero-art shadow-lg" role="img" aria-label="Portrait of Linet Wairimu">
+              <img className="hero-portrait" src={portraitImage} alt="" />
               <div className="art-ring ring-one" /><div className="art-ring ring-two" />
-              <div className="art-monogram">LW</div>
               <span className="art-note note-top">curious<br /><strong>by nature</strong></span>
               <span className="art-note note-bottom">design + code<br /><strong>in balance</strong></span>
               <span className="art-star">✳</span>
