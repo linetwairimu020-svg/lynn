@@ -36,6 +36,9 @@ Set `VITE_API_BASE_URL=http://localhost:3000/api` in `frontend/.env` (copy `fron
 | `PORT` | `3000` | API port |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Exact allowed frontend origins; credentials enabled |
 | `SESSION_TTL_HOURS` | `8` | Server-side session lifetime (1–168 hours) |
+| `APP_BASE_URL` | First configured CORS origin | Public frontend origin used to build password-reset links; production must use HTTPS |
+| `RESEND_API_KEY` | (set locally) | Resend API key used only by the backend for reset email delivery |
+| `RESEND_FROM_EMAIL` | (set locally) | Verified sender address/name configured in Resend |
 | `PGHOST` | `127.0.0.1` | Local PostgreSQL host |
 | `PGPORT` | `5432` | PostgreSQL port |
 | `PGDATABASE` | `lynn_portfolio` | PostgreSQL database name |
@@ -65,12 +68,16 @@ Invoke-RestMethod http://127.0.0.1:3000/api/health
 - `GET /api/auth/csrf` issues a synchronizer token for state-changing requests.
 - `POST /api/auth/register` creates an ordinary user account only; an optional phone number is stored privately and excluded from public user responses.
 - `POST /api/auth/login` verifies credentials and sets a session cookie.
+- `POST /api/auth/password-reset` sends a one-hour reset link through Resend when the account exists. It always returns a generic `202` message to avoid account enumeration; requests are rate-limited.
+- `POST /api/auth/password-reset/confirm` accepts `{ "token": "...", "password": "..." }`, consumes the token once, changes the Argon2id password hash, and revokes all active sessions.
 - `GET /api/auth/me` returns safe public profile fields, persisted preferences, linked integration status, and the current session start time.
 - `POST /api/auth/logout` removes the session and clears the cookies.
 - `PATCH /api/user/preferences` updates the signed-in user's communication preferences, region, and timezone. The request accepts a partial object and requires the session CSRF token.
 - `GET /api/admin/access` is a server-checked admin endpoint; `/api/admin/*` requests are denied unless the session belongs to an administrator.
 
 The session cookie is HTTP-only, SameSite=Lax, and Secure in production; session records are server-side. CSRF tokens are required for mutations. Login and registration have IP-based rate limits. Passwords are hashed with Argon2id. Login failures use a generic message. Public registration rejects role fields and cannot provision administrators. For deployment, serve the UI and API on the same site (or behind a same-site reverse proxy) so the SameSite=Lax cookie is sent; configure HTTPS and exact production CORS origins.
+
+To enable password reset, set `APP_BASE_URL`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` in the private `backend/.env`. Verify the sender domain/address in Resend before sending email. Keep the Resend key server-side; never use a `VITE_` variable for it. Reset tokens are cryptographically random, stored only as SHA-256 hashes, expire after one hour, and are invalidated after use. When delivery fails, the backend logs the provider error, removes the unused token where possible, and keeps the same generic response to prevent disclosing whether the email belongs to an account. If Resend settings are missing, the endpoint returns a uniform temporary-unavailable response before checking account existence.
 
 Account records store `lastLoginAt`, preferences, and linked integrations. The account UI measures the current session duration from the server-issued session `createdAt`; it does not represent cumulative time across multiple sessions. Integration status is read-only in this UI and is based on provider records (`google`, `github`, or `calendar`) with a `connectedAt` timestamp. Add provider-specific OAuth authorization/callback routes that write those records only after validating provider state and tokens; do not let the browser mark an integration as connected.
 
@@ -115,7 +122,7 @@ Replace the example with the exact email address of the account you intend to au
 
 At startup, the API creates the `lynn_documents` table if needed and initializes each application document. On the first access to a document key, if no matching database row exists, its corresponding legacy JSON file is validated and imported. If there is no legacy file, the relevant portfolio defaults (or an empty user/session/message collection) are used. An existing database row is never replaced by a JSON file. Invalid JSON is reported and not imported. Each import and update is transactional and uses a row lock, so concurrent requests cannot lose updates.
 
-Document keys include `users.json`, `sessions.json`, `projects.json`, `services.json`, `skills.json`, `profile.json`, `social-links.json`, `settings.json`, and `messages.json`. User records retain their existing Argon2id hashes, roles, IDs, and normalized emails; session documents contain only token hashes and server-side CSRF tokens. The JSON files remain untouched as a backup/import source and are not updated after import. PostgreSQL is the runtime source of truth; back up the database as well as retaining the old JSON files. Never expose the database or data files publicly.
+Document keys include `users.json`, `sessions.json`, `password-resets.json`, `projects.json`, `services.json`, `skills.json`, `profile.json`, `social-links.json`, `settings.json`, and `messages.json`. User records retain their existing Argon2id hashes, roles, IDs, and normalized emails; session documents store token hashes and CSRF tokens, while password-reset documents store only reset-token hashes, user IDs, and expiration times. The JSON files remain untouched as a backup/import source and are not updated after import. PostgreSQL is the runtime source of truth; back up the database as well as retaining the old JSON files. Never expose the database or data files publicly.
 
 After starting the backend, verify database initialization without selecting private user or message data:
 
@@ -129,7 +136,7 @@ SELECT document_key FROM lynn_documents ORDER BY document_key;
 
 Use `/login` and `/register` for the standalone authentication views. Registration collects a first and last name, email, optional phone number, and password; the combined name is stored on the user record, and the optional phone number is kept private. The admin dashboard remains at `/?view=admin`; optional sections use `/?view=admin&section=projects` (and `services`, `skills`, `profile`, `social-links`, `messages`, or `settings`). Legacy query-style login and registration URLs redirect to the separate routes, and old `/admin/...` paths redirect to the admin view.
 
-The admin route checks the current server-backed user and calls the protected admin access endpoint. Dashboard collection and singleton edits, visibility toggles, deletes, and the contact inbox use the protected API. Public portfolio components fetch server content; successful admin changes refresh same-tab and other open tabs. When the backend is unavailable, public components can display the bundled defaults, but administrator editing reports the API error and does not save to browser storage. Existing edits previously saved only in the browser are not automatically imported; when no corresponding legacy JSON file exists, the backend initializes portfolio content from the current source-controlled defaults. Contact messages are stored privately; password reset and media uploads are not implemented.
+The admin route checks the current server-backed user and calls the protected admin access endpoint. Dashboard collection and singleton edits, visibility toggles, deletes, and the contact inbox use the protected API. Public portfolio components fetch server content; successful admin changes refresh same-tab and other open tabs. When the backend is unavailable, public components can display the bundled defaults, but administrator editing reports the API error and does not save to browser storage. Existing edits previously saved only in the browser are not automatically imported; when no corresponding legacy JSON file exists, the backend initializes portfolio content from the current source-controlled defaults. Contact messages are stored privately; password reset email delivery requires the Resend settings described above, and media uploads are not implemented.
 
 ## Tests
 

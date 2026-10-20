@@ -143,6 +143,17 @@ export async function updateLastLogin(id, lastLoginAt = new Date().toISOString()
   });
 }
 
+export async function updateUserPassword(id, passwordHash) {
+  return withDocumentArray(FILE_NAME, validateUsers, async (users) => {
+    const index = users.findIndex((user) => user.id === id);
+    if (index < 0) return { value: null, changed: false };
+    const updated = { ...users[index], passwordHash };
+    const records = [...users];
+    records[index] = updated;
+    return { value: updated, records, changed: true };
+  });
+}
+
 export async function updateUserPreferences(id, changes) {
   return withDocumentArray(FILE_NAME, validateUsers, async (users) => {
     const index = users.findIndex((user) => user.id === id);

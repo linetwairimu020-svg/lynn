@@ -79,6 +79,7 @@ export const apiService = {
     },
     csrf: () => request('/auth/csrf'),
     requestPasswordReset: (email) => request('/auth/password-reset', json('POST', { email })),
+    completePasswordReset: (token, password) => request('/auth/password-reset/confirm', json('POST', { token, password })),
   },
   user: {
     updatePreferences: (preferences) => requestWithCsrf('/user/preferences', json('PATCH', preferences)),

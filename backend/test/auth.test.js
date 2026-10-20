@@ -9,6 +9,9 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
+process.env.RESEND_API_KEY = 're_test_key';
+process.env.RESEND_FROM_EMAIL = 'Lynn Tests <accounts@example.test>';
+process.env.APP_BASE_URL = 'http://localhost:5173';
 
 const frontendOrigin = 'http://localhost:5173';
 const execFileAsync = promisify(execFile);
@@ -240,6 +243,87 @@ test('updates only the authenticated user preferences and validates timezone and
   const storedUser = storedUsers.find((user) => user.emailNormalized === newUser.email.toLowerCase());
   assert.equal(storedUser.preferences.region, 'Kenya');
   assert.ok(storedUser.lastLoginAt);
+});
+
+test('password reset emails a single-use token, updates the password, and revokes sessions', async () => {
+  const originalFetch = globalThis.fetch;
+  const resetUser = {
+    name: 'Password Reset Test',
+    email: 'password-reset@example.com',
+    password: 'OriginalPassword123',
+  };
+  await userStore.createUser({
+    name: resetUser.name,
+    email: resetUser.email,
+    passwordHash: await argon2.hash(resetUser.password, { type: argon2.argon2id }),
+  });
+  let sentEmail;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) !== 'https://api.resend.com/emails') return originalFetch(url, options);
+    assert.equal(options.headers.Authorization, 'Bearer re_test_key');
+    sentEmail = JSON.parse(options.body);
+    return new Response(JSON.stringify({ id: 'email_test_id' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    const jar = new Map();
+    const session = await sessionStore.createSession((await userStore.findUserByEmail(resetUser.email)).id);
+    jar.set('lynn.sid', session.token);
+    jar.set('lynn.csrf', session.csrfToken);
+    assert.equal((await request('/api/auth/me', jar)).response.status, 200);
+    const requested = await request('/api/auth/password-reset', new Map(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: resetUser.email }),
+    });
+    assert.equal(requested.response.status, 202);
+    assert.match(requested.body.message, /If an account exists/);
+    assert.equal(sentEmail.to[0], resetUser.email);
+    const resetUrl = new URL(sentEmail.text.match(/http:\/\/[^\s]+/)[0]);
+    assert.equal(resetUrl.pathname, '/reset-password');
+    const token = resetUrl.searchParams.get('token');
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+    const storedResetTokens = JSON.parse(await readFile(path.join(dataDir, 'password-resets.json'), 'utf8'));
+    assert.equal(storedResetTokens.length, 1);
+    assert.equal(storedResetTokens[0].tokenHash.length, 64);
+    assert.equal(JSON.stringify(storedResetTokens).includes(token), false);
+
+    const unknownAccount = await request('/api/auth/password-reset', new Map(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'missing@example.com' }),
+    });
+    assert.equal(unknownAccount.response.status, requested.response.status);
+    assert.equal(unknownAccount.body.message, requested.body.message);
+
+    const reset = await request('/api/auth/password-reset/confirm', new Map(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: 'NewSecurePassword456' }),
+    });
+    assert.equal(reset.response.status, 200);
+    assert.match(reset.body.message, /password has been reset/);
+    assert.deepEqual(JSON.parse(await readFile(path.join(dataDir, 'password-resets.json'), 'utf8')), []);
+
+    const replay = await request('/api/auth/password-reset/confirm', new Map(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: 'AnotherSecurePassword789' }),
+    });
+    assert.equal(replay.response.status, 400);
+    assert.equal(replay.body.error.code, 'INVALID_RESET_TOKEN');
+
+    const revokedSession = await request('/api/auth/me', jar);
+    assert.equal(revokedSession.response.status, 401);
+    const updatedUser = await userStore.findUserByEmail(resetUser.email);
+    assert.equal(await argon2.verify(updatedUser.passwordHash, resetUser.password), false);
+    assert.equal(await argon2.verify(updatedUser.passwordHash, 'NewSecurePassword456'), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('denies ordinary users and safely provisions an existing account without changing credentials', async () => {

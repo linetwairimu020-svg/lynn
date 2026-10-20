@@ -66,7 +66,7 @@ export default function Login({ embedded = false, isDevelopmentMode = false }) {
       {error && <p className="alert alert-warning mt-3 mb-0" role="alert">{error}</p>}
       {prototypeSuccess && <p className="alert alert-success mt-3 mb-0" role="status">Prototype Mode: Backend server is currently offline. Frontend validation successful! No server session was created.</p>}
     </form>
-    <p className="small mt-3 mb-1"><button type="button" className="text-link" disabled title="Password reset is not available in this frontend prototype." aria-describedby="password-reset-help">Forgot password? (unavailable)</button><small className="d-block text-secondary mt-1" id="password-reset-help">Password reset is not available in this frontend prototype.</small></p>
+    <p className="small mt-3 mb-1"><Link to="/forgot-password">Forgot password?</Link></p>
     <p className="small text-secondary">New here? <Link to="/register">Register here</Link></p>
   </>;
 

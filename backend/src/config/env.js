@@ -67,12 +67,28 @@ if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1' && host !== '
   throw new Error('HOST must be a hostname or IP address.');
 }
 
+const appBaseUrl = new URL(process.env.APP_BASE_URL || configOriginFallback());
+if (!['http:', 'https:'].includes(appBaseUrl.protocol)
+  || (nodeEnv === 'production' && appBaseUrl.protocol !== 'https:')
+  || appBaseUrl.pathname !== '/' || appBaseUrl.username || appBaseUrl.password || appBaseUrl.search || appBaseUrl.hash) {
+  throw new Error('APP_BASE_URL must be an HTTP(S) origin without credentials, path, query, or fragment; production requires HTTPS.');
+}
+
+function configOriginFallback() {
+  return parseCorsOrigins(process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')[0];
+}
+
 export const config = Object.freeze({
   nodeEnv,
   host,
   port: parsePort(process.env.PORT || '3000'),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173'),
   sessionTtlMs: parseSessionTtl(process.env.SESSION_TTL_HOURS || '8'),
+  appBaseUrl: appBaseUrl.origin,
+  resend: Object.freeze({
+    apiKey: process.env.RESEND_API_KEY?.trim() || '',
+    fromEmail: process.env.RESEND_FROM_EMAIL?.trim() || '',
+  }),
   databaseConfig,
   dataDir: path.resolve(backendRoot, process.env.DATA_DIR || 'data'),
 });

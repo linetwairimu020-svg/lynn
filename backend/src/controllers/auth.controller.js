@@ -1,4 +1,5 @@
 import argon2 from 'argon2';
+import { config } from '../config/env.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import {
   clearAuthCookies,
@@ -9,15 +10,27 @@ import {
   setAuthCookies,
   setCsrfCookie,
 } from '../middleware/csrf.js';
-import { createSession, deleteSession, findSession } from '../services/sessionStore.js';
+import { createSession, deleteSession, deleteSessionsForUser, findSession } from '../services/sessionStore.js';
 import {
   createUser,
   findUserByEmail,
   findUserById,
   toPublicUser,
   updateLastLogin,
+  updateUserPassword,
 } from '../services/userStore.js';
-import { validateLogin, validateRegistration } from '../services/authValidation.js';
+import {
+  validateLogin,
+  validatePasswordReset,
+  validatePasswordResetRequest,
+  validateRegistration,
+} from '../services/authValidation.js';
+import {
+  consumePasswordResetToken,
+  createPasswordResetToken,
+  deletePasswordResetToken,
+} from '../services/passwordResetStore.js';
+import { sendPasswordResetEmail } from '../services/resendEmail.js';
 
 export async function issueCsrf(request, response) {
   const token = readCookie(request, SESSION_COOKIE);
@@ -64,6 +77,49 @@ export async function logout(request, response) {
   await deleteSession(readCookie(request, SESSION_COOKIE));
   clearAuthCookies(response);
   response.json({ message: 'Signed out.' });
+}
+
+export async function requestPasswordReset(request, response) {
+  const { email } = validatePasswordResetRequest(request.body);
+  if (!config.resend.apiKey || !config.resend.fromEmail) {
+    throw new HttpError(503, 'PASSWORD_RESET_UNAVAILABLE', 'Password reset is temporarily unavailable. Please try again later.');
+  }
+
+  const user = await findUserByEmail(email);
+  if (user) {
+    const token = await createPasswordResetToken(user.id);
+    const resetUrl = new URL('/reset-password', config.appBaseUrl);
+    resetUrl.searchParams.set('token', token);
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl.toString());
+    } catch (error) {
+      try {
+        await deletePasswordResetToken(token);
+      } catch (cleanupError) {
+        console.error('Could not remove an undelivered password reset token:', cleanupError);
+      }
+      console.error('Password reset email delivery failed:', error);
+    }
+  }
+
+  response.status(202).json({
+    message: 'If an account exists for that email address, password reset instructions will arrive shortly.',
+  });
+}
+
+export async function completePasswordReset(request, response) {
+  const { token, password } = validatePasswordReset(request.body);
+  const userId = await consumePasswordResetToken(token);
+  if (!userId) {
+    throw new HttpError(400, 'INVALID_RESET_TOKEN', 'This password reset link is invalid or has expired.');
+  }
+  const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+  const user = await updateUserPassword(userId, passwordHash);
+  if (!user) {
+    throw new HttpError(400, 'INVALID_RESET_TOKEN', 'This password reset link is invalid or has expired.');
+  }
+  await deleteSessionsForUser(userId);
+  response.json({ message: 'Your password has been reset. Sign in with your new password.' });
 }
 
 export function adminAccess(request, response) {
