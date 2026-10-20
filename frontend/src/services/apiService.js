@@ -80,6 +80,9 @@ export const apiService = {
     csrf: () => request('/auth/csrf'),
     requestPasswordReset: (email) => request('/auth/password-reset', json('POST', { email })),
   },
+  user: {
+    updatePreferences: (preferences) => requestWithCsrf('/user/preferences', json('PATCH', preferences)),
+  },
   admin: {
     authorize: () => request('/admin/access'),
     overview: () => request('/admin/overview'),

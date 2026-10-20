@@ -106,7 +106,10 @@ test('initializes empty JSON data files without exposing a public data path', as
 test('registers an ordinary user and returns no credential material', async () => {
   const result = await postWithCsrf('/api/auth/register', { ...newUser, phone: '+1 (555) 123-4567' }, new Map());
   assert.equal(result.response.status, 201);
-  assert.deepEqual(Object.keys(result.body.user).sort(), ['createdAt', 'email', 'id', 'name', 'role']);
+  assert.deepEqual(Object.keys(result.body.user).sort(), [
+    'avatarUrl', 'createdAt', 'email', 'firstName', 'id', 'integrations',
+    'lastLoginAt', 'lastName', 'location', 'name', 'preferences', 'role',
+  ]);
   assert.equal(result.body.user.email, newUser.email);
   assert.equal(result.body.user.role, 'user');
   assert.equal('phone' in result.body.user, false);
@@ -198,6 +201,45 @@ test('returns the authenticated user from /me and requires a valid session', asy
   assert.equal(authenticated.body.user.email, newUser.email);
   assert.ok(authenticated.body.csrfToken);
   assert.equal(JSON.stringify(authenticated.body).includes('passwordHash'), false);
+});
+
+test('updates only the authenticated user preferences and validates timezone and field types', async () => {
+  const jar = new Map();
+  await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, jar);
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': decodeURIComponent(jar.get('lynn.csrf')),
+  };
+  const updated = await request('/api/user/preferences', jar, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ email: true, region: 'Kenya', timezone: 'Africa/Nairobi' }),
+  });
+  assert.equal(updated.response.status, 200);
+  assert.equal(updated.body.user.preferences.email, true);
+  assert.equal(updated.body.user.preferences.region, 'Kenya');
+  assert.equal(updated.body.user.preferences.timezone, 'Africa/Nairobi');
+  assert.equal(updated.body.user.preferences.sms, false);
+  assert.ok(updated.body.user.sessionStartedAt);
+  assert.equal(JSON.stringify(updated.body).includes('passwordHash'), false);
+
+  const invalidTimezone = await request('/api/user/preferences', jar, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ timezone: 'Not/A_Timezone' }),
+  });
+  assert.equal(invalidTimezone.response.status, 400);
+  const invalidField = await request('/api/user/preferences', jar, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ email: 'yes' }),
+  });
+  assert.equal(invalidField.response.status, 400);
+
+  const storedUsers = JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8'));
+  const storedUser = storedUsers.find((user) => user.emailNormalized === newUser.email.toLowerCase());
+  assert.equal(storedUser.preferences.region, 'Kenya');
+  assert.ok(storedUser.lastLoginAt);
 });
 
 test('denies ordinary users and safely provisions an existing account without changing credentials', async () => {

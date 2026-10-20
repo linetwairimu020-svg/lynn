@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import AdminLink from './AdminLink';
 import MobileNavigationDrawer from './MobileNavigationDrawer';
+import useAuth from '../hooks/useAuth';
 
 const navigationIcons = {
   home: 'bi-house-door',
@@ -16,6 +17,7 @@ const navigationIcons = {
 export default function Navbar({ brand = 'LW', links = [], dark = false, cartCount, onCart, logoSrc }) {
   const activeLogoSrc = logoSrc || (brand === 'APEX HARDWARE' ? '/logo.png' : null);
   const { pathname, search } = useLocation();
+  const { user } = useAuth();
   const [activeHref, setActiveHref] = useState('');
 
   useEffect(() => {
@@ -59,8 +61,8 @@ export default function Navbar({ brand = 'LW', links = [], dark = false, cartCou
                 : <a className={`nav-link ${activeHref === link.href ? 'active' : ''}`} href={link.href} key={link.label} aria-current={activeHref === link.href ? 'location' : undefined}>{brand === 'LW' && <i className={`bi ${navigationIcons[link.label.toLowerCase()] || 'bi-circle'}`} aria-hidden="true" />}<span>{link.label}</span></a>
             ))}
             {brand === 'LW' && <>
-              <Link className="portfolio-auth-signup" to="/register">
-                <i className="bi bi-person-plus" aria-hidden="true" /><span>Sign Up</span>
+              <Link className="portfolio-auth-signup" to={user ? '/account' : '/register'}>
+                <i className={`bi ${user ? 'bi-person-circle' : 'bi-person-plus'}`} aria-hidden="true" /><span>{user ? 'My Account' : 'Sign Up'}</span>
               </Link>
               <AdminLink className="nav-link portfolio-admin-link" />
             </>}

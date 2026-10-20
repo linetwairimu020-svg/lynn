@@ -65,11 +65,14 @@ Invoke-RestMethod http://127.0.0.1:3000/api/health
 - `GET /api/auth/csrf` issues a synchronizer token for state-changing requests.
 - `POST /api/auth/register` creates an ordinary user account only; an optional phone number is stored privately and excluded from public user responses.
 - `POST /api/auth/login` verifies credentials and sets a session cookie.
-- `GET /api/auth/me` returns safe public fields for the active session.
+- `GET /api/auth/me` returns safe public profile fields, persisted preferences, linked integration status, and the current session start time.
 - `POST /api/auth/logout` removes the session and clears the cookies.
+- `PATCH /api/user/preferences` updates the signed-in user's communication preferences, region, and timezone. The request accepts a partial object and requires the session CSRF token.
 - `GET /api/admin/access` is a server-checked admin endpoint; `/api/admin/*` requests are denied unless the session belongs to an administrator.
 
 The session cookie is HTTP-only, SameSite=Lax, and Secure in production; session records are server-side. CSRF tokens are required for mutations. Login and registration have IP-based rate limits. Passwords are hashed with Argon2id. Login failures use a generic message. Public registration rejects role fields and cannot provision administrators. For deployment, serve the UI and API on the same site (or behind a same-site reverse proxy) so the SameSite=Lax cookie is sent; configure HTTPS and exact production CORS origins.
+
+Account records store `lastLoginAt`, preferences, and linked integrations. The account UI measures the current session duration from the server-issued session `createdAt`; it does not represent cumulative time across multiple sessions. Integration status is read-only in this UI and is based on provider records (`google`, `github`, or `calendar`) with a `connectedAt` timestamp. Add provider-specific OAuth authorization/callback routes that write those records only after validating provider state and tokens; do not let the browser mark an integration as connected.
 
 ## Portfolio content and contact endpoints
 

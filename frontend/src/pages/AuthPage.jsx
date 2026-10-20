@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import portraitImage from '../../assets/Intense Braided Bun Studio Portrait.png';
 import profile from '../data/profile';
+import useAuth from '../hooks/useAuth';
 import Login from './Login';
 import Register from './Register';
 
@@ -83,8 +84,12 @@ function UserPreferencesPreview() {
 
 export default function AuthPage() {
   const { pathname } = useLocation();
+  const { user, loading } = useAuth();
   const isRegister = pathname === '/register';
   const [isDevelopmentMode] = useState(true);
+
+  if (loading) return <main className="container py-5" role="status">Checking your sign-in…</main>;
+  if (user) return <Navigate to="/account" replace />;
 
   return <div className={`auth-page ${isRegister ? 'register-page' : 'login-page'}`}>
     <header className="register-header">

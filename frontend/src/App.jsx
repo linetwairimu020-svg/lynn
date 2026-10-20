@@ -10,6 +10,8 @@ import ProductDetails from './pages/ProductDetails';
 import AuthPage from './pages/AuthPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminRoute from './routes/AdminRoute';
+import AccountRoute from './routes/AccountRoute';
+import AccountDashboard from './pages/AccountDashboard';
 import useContent from './hooks/useContent';
 
 function PageMetadata() {
@@ -22,6 +24,7 @@ function PageMetadata() {
       '/': [settings.siteTitle, 'Linet Wairimu is a developer and designer creating thoughtful digital experiences.'],
       '/login': ['Sign in | Linet Wairimu', 'Sign in to your Lynn portfolio account.'],
       '/register': ['Create an account | Linet Wairimu', 'Create a Lynn portfolio account.'],
+      '/account': ['My account | Linet Wairimu', 'Your account profile and workspace preferences.'],
       '/about': [settings.siteTitle, 'Learn about Linet Wairimu, an emerging developer and designer.'],
       '/contact': [settings.siteTitle, 'Contact Linet Wairimu about a project or collaboration.'],
       '/bakery': ['Hearth & Crumb | Coming Soon', 'A preview of Hearth & Crumb, a small-batch bakery concept coming soon to Nairobi.'],
@@ -93,6 +96,7 @@ export default function App() {
         <Route path="/" element={<SharedEntry />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
+        <Route path="/account" element={<AccountRoute><AccountDashboard /></AccountRoute>} />
         <Route path="/about" element={<Home />} />
         <Route path="/projects" element={<Navigate to="/#work" replace />} />
         <Route path="/contact" element={<Home />} />

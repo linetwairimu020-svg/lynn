@@ -11,6 +11,7 @@ function validateSessions(sessions) {
     if (!session || typeof session.tokenHash !== 'string' || !session.tokenHash
       || typeof session.userId !== 'string' || !session.userId
       || typeof session.csrfToken !== 'string' || !session.csrfToken
+      || (session.createdAt !== undefined && !Number.isFinite(Date.parse(session.createdAt)))
       || !Number.isFinite(Date.parse(session.expiresAt))
       || tokenHashes.has(session.tokenHash)) {
       throw new Error(`${FILE_NAME} contains an invalid or duplicate session record.`);
@@ -24,10 +25,12 @@ const hashToken = (token) => createHash('sha256').update(token).digest('hex');
 export async function createSession(userId) {
   const token = randomBytes(32).toString('base64url');
   const csrfToken = randomBytes(32).toString('base64url');
+  const createdAt = new Date().toISOString();
   const session = {
     tokenHash: hashToken(token),
     userId,
     csrfToken,
+    createdAt,
     expiresAt: new Date(Date.now() + config.sessionTtlMs).toISOString(),
   };
   await withDocumentArray(FILE_NAME, validateSessions, async (sessions) => ({
@@ -35,7 +38,7 @@ export async function createSession(userId) {
     records: [...sessions.filter((item) => Date.parse(item.expiresAt) > Date.now()), session],
     changed: true,
   }));
-  return { token, csrfToken, expiresAt: session.expiresAt };
+  return { token, csrfToken, createdAt, expiresAt: session.expiresAt };
 }
 
 export async function findSession(token) {

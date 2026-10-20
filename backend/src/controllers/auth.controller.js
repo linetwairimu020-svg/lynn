@@ -10,7 +10,13 @@ import {
   setCsrfCookie,
 } from '../middleware/csrf.js';
 import { createSession, deleteSession, findSession } from '../services/sessionStore.js';
-import { createUser, findUserByEmail, findUserById, toPublicUser } from '../services/userStore.js';
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  toPublicUser,
+  updateLastLogin,
+} from '../services/userStore.js';
 import { validateLogin, validateRegistration } from '../services/authValidation.js';
 
 export async function issueCsrf(request, response) {
@@ -35,9 +41,11 @@ export async function login(request, response) {
     if (!user) await argon2.hash(credentials.password, { type: argon2.argon2id });
     throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
+  const lastLoginAt = new Date().toISOString();
+  const updatedUser = await updateLastLogin(user.id, lastLoginAt);
   const session = await createSession(user.id);
   setAuthCookies(response, session.token, session.csrfToken, sessionCookieMaxAge());
-  response.json({ user: toPublicUser(user), csrfToken: session.csrfToken });
+  response.json({ user: toPublicUser(updatedUser, session.createdAt), csrfToken: session.csrfToken });
 }
 
 export async function currentUser(request, response) {
@@ -49,7 +57,7 @@ export async function currentUser(request, response) {
     throw new HttpError(401, 'AUTHENTICATION_REQUIRED', 'Sign in to continue.');
   }
   setCsrfCookie(response, session.csrfToken, sessionCookieMaxAge());
-  response.json({ user: toPublicUser(user), csrfToken: session.csrfToken });
+  response.json({ user: toPublicUser(user, session.createdAt), csrfToken: session.csrfToken });
 }
 
 export async function logout(request, response) {
