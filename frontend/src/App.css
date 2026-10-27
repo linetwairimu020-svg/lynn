@@ -150,15 +150,6 @@ body { background: var(--cream); color: var(--ink); }
 .mobile-nav-signup:hover { background: var(--plum-deep); transform: translateY(-1px); }
 .register-main { align-items: flex-start; display: flex; justify-content: center; min-height: calc(100vh - 5.25rem); padding: clamp(2rem, 6vh, 4rem) 1.25rem; }
 .register-page .register-card { background: #fff; border: 1px solid rgba(55,29,53,.1); border-radius: 1rem; box-shadow: 0 .75rem 2rem rgba(55,29,53,.08); max-width: 38rem; padding: clamp(1.5rem, 4vw, 2.75rem); width: 100%; }
-.register-main-with-preview { padding: clamp(2rem, 5vh, 3.75rem) clamp(1.25rem, 4vw, 4rem); }
-.register-layout { align-items: start; display: grid; gap: clamp(1.5rem, 3vw, 3.5rem); grid-template-columns: minmax(0, 1.08fr) minmax(21rem, .92fr); margin: 0 auto; max-width: 1360px; width: 100%; }
-.register-page .register-layout .register-card { max-width: none; padding: clamp(1.4rem, 2.6vw, 2.6rem); }
-.register-page .register-prototype-badge { align-items: center; display: inline-flex; gap: .45rem; }
-.register-preview-column { align-self: start; display: grid; gap: 1rem; min-width: 0; position: sticky; top: 1rem; }
-.register-preview-intro { padding: .1rem .3rem .3rem; }
-.register-preview-intro .register-kicker { margin-bottom: .45rem; }
-.register-preview-intro h2 { color: var(--plum); font-size: clamp(1.45rem, 2vw, 1.85rem); font-weight: 600; line-height: 1.2; margin: 0; }
-.register-preview-intro > p:last-child { color: #746a72; font-size: .86rem; line-height: 1.55; margin: .5rem 0 0; max-width: 34rem; }
 .register-preview-card { animation: register-preview-in .5s ease-out both; background: #fff; border: 1px solid rgba(55,29,53,.11); border-radius: .95rem; box-shadow: 0 .7rem 1.8rem rgba(55,29,53,.075); min-width: 0; padding: clamp(1rem, 1.8vw, 1.4rem); }
 .profile-preview-card { animation-delay: .08s; transform: translateX(.55rem); }
 .preferences-preview-card { animation-delay: .18s; transform: translateX(-.25rem); }
@@ -225,18 +216,9 @@ body { background: var(--cream); color: var(--ink); }
 .account-preference-fields .form-select { color: var(--plum); font-size: .72rem; }
 .account-back-link { margin-top: 1.25rem; }
 @media (max-width: 767.98px) { .account-grid { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 991.98px) {
-  .register-layout { grid-template-columns: minmax(0, 1fr); max-width: 46rem; }
-  .register-preview-column { align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr)); position: static; }
-  .register-preview-intro { grid-column: 1 / -1; }
-}
 @media (max-width: 620px) {
-  .register-main-with-preview { padding-left: .75rem; padding-right: .75rem; }
-  .register-preview-column { grid-template-columns: minmax(0, 1fr); }
-  .register-preview-intro { grid-column: auto; }
   .profile-preview-card, .preferences-preview-card { transform: none; }
 }
-.register-prototype-badge { background: #f8f2e7; border: 1px solid rgba(195,154,88,.35); border-radius: 999px; color: #725b36; display: table; font-size: .72rem; font-weight: 600; letter-spacing: .015em; margin: 0 0 1.4rem; padding: .45rem .8rem; }
 .register-kicker { color: var(--coral); font-size: .74rem; font-weight: 700; letter-spacing: .12em; margin: 0 0 .65rem; text-transform: uppercase; }
 .register-title { color: var(--plum); font-family: 'Playfair Display', Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.2rem); font-weight: 600; letter-spacing: -.025em; line-height: 1.2; margin: 0; }
 .register-description { color: var(--register-muted); font-size: .94rem; line-height: 1.6; margin: .6rem 0 1.6rem; }

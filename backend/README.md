@@ -47,7 +47,7 @@ Set `VITE_API_BASE_URL=http://localhost:3000/api` in `frontend/.env` (copy `fron
 | `DATABASE_URL` | (optional) | Alternative full PostgreSQL connection URL |
 | `DATA_DIR` | `./data` | Read-only directory for one-time legacy JSON import |
 
-The backend loads only `backend/.env` with `dotenv`. Frontend variables belong in `frontend/.env`; never put database credentials there because Vite bundles frontend variables into browser code. Set either `DATABASE_URL` or the `PG*` connection settings in `backend/.env`. Create the local database before starting the API, for example with `createdb -U <PGUSER> <PGDATABASE>`; enter the PostgreSQL password when prompted. The backend creates its application table automatically. Never commit `.env`, database credentials, or private JSON data. `.gitignore` excludes `.env` and `data/`. CORS rejects unlisted origins and does not allow `*`.
+The backend loads only `backend/.env` with `dotenv`. Frontend variables belong in `frontend/.env`; never put database credentials there because Vite bundles frontend variables into browser code. Set either `DATABASE_URL` (including its PostgreSQL username and password) or the `PG*` connection settings, including a non-empty `PGPASSWORD`, in `backend/.env`. Create the local database before starting the API, for example with `createdb -U <PGUSER> <PGDATABASE>`; enter the PostgreSQL password when prompted. The backend creates its application table automatically. Never commit `.env`, database credentials, or private JSON data. `.gitignore` excludes `.env` and `data/`. CORS rejects unlisted origins and does not allow `*`.
 
 ## Start and check
 

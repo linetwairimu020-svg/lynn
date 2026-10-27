@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import PhoneInputModule from 'react-phone-input-2';
-import { isBackendUnavailable, register } from '../services/authService';
+import { register } from '../services/authService';
 
 const PhoneInput = PhoneInputModule.default;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{12,128}$/;
 
-export default function Register({ isDevelopmentMode = false }) {
+export default function Register() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ kind: '', text: '' });
@@ -17,8 +18,6 @@ export default function Register({ isDevelopmentMode = false }) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [registeredName, setRegisteredName] = useState('');
-  const [prototypeRegistration, setPrototypeRegistration] = useState(false);
 
   const visibilityIcon = (visible) => (
     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -41,21 +40,8 @@ export default function Register({ isDevelopmentMode = false }) {
     setMessage({ kind: '', text: '' });
     try {
       const name = [firstName, lastName].map((part) => part.trim()).filter(Boolean).join(' ');
-      try {
-        await register({ name, email: email.trim(), phone: phone.trim(), password });
-        setPrototypeRegistration(false);
-      } catch (error) {
-        if (!isDevelopmentMode || !isBackendUnavailable(error)) throw error;
-        setPrototypeRegistration(true);
-      }
-      setRegisteredName(name);
-      form.reset();
-      setFirstName('');
-      setLastName('');
-      setEmail('');
-      setPhone('');
-      setPassword('');
-      setConfirmation('');
+      await register({ name, email: email.trim(), phone: phone.trim(), password });
+      navigate('/account', { replace: true });
     } catch (error) {
       setMessage({ kind: 'error', text: error.message });
     } finally {
@@ -63,22 +49,7 @@ export default function Register({ isDevelopmentMode = false }) {
     }
   };
 
-  return registeredName ? <>
-    <div className="auth-success">
-      <span className="auth-success-icon" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m3 8 3.2 3.2L13 4.5" /></svg></span>
-      <p className="register-kicker">You’re all set</p>
-      <h1 className="h2 serif-title" id="register-heading">Welcome, {registeredName}.</h1>
-      <p className="register-description" role="status">
-        {prototypeRegistration
-          ? 'Prototype Mode: Backend server is currently offline. Frontend validation successful! No account was created.'
-          : 'Your account has been created. You can now sign in and continue exploring.'}
-      </p>
-      <div className="d-grid gap-2">
-        <Link className="btn register-submit" to="/login">Continue to login</Link>
-        <Link className="btn register-secondary-action" to="/#work">Explore my projects</Link>
-      </div>
-    </div>
-  </> : <>
+  return <>
     <p className="register-kicker">Account access</p>
     <h1 className="register-title" id="register-heading">Register a New Account.</h1>
     <p className="register-description">Create your account and stay connected.</p>

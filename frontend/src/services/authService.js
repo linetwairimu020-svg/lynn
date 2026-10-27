@@ -4,11 +4,6 @@ const listeners = new Set();
 let snapshot = { user: null, loading: true, error: '' };
 let authGeneration = 0;
 
-export function isBackendUnavailable(error) {
-  return error instanceof Error
-    && error.message === 'Could not reach the server. Check your connection and try again.';
-}
-
 function notify() {
   listeners.forEach((listener) => listener());
 }
@@ -45,7 +40,10 @@ export async function login(credentials) {
 }
 
 export async function register(details) {
-  return apiService.auth.register(details);
+  const result = await apiService.auth.register(details);
+  authGeneration++;
+  updateSnapshot({ user: result.user, loading: false, error: '' });
+  return result.user;
 }
 
 export async function logout() {
@@ -55,7 +53,7 @@ export async function logout() {
     updateSnapshot({ user: null, loading: false, error: '' });
   } catch (error) {
     const current = await loadCurrentUser();
-    if (current.status !== 401) throw error;
+    if (current.status !== 200 || current.user) throw error;
   }
 }
 

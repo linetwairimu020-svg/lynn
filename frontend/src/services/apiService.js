@@ -68,10 +68,16 @@ export const apiService = {
   auth: {
     login: (credentials) => requestWithCsrf('/auth/login', json('POST', credentials)),
     register: (details) => requestWithCsrf('/auth/register', json('POST', details)),
-    logout: () => requestWithCsrf('/auth/logout', { method: 'POST' }),
+    logout: async () => {
+      const result = await requestWithCsrf('/auth/logout', { method: 'POST' });
+      csrfToken = '';
+      return result;
+    },
     currentUser: async () => {
       try {
-        return await request('/auth/me');
+        const result = await request('/auth/me');
+        if (!result.user) csrfToken = '';
+        return result;
       } catch (error) {
         if (error.status === 401) csrfToken = '';
         throw error;

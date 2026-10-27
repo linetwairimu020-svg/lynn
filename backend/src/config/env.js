@@ -47,6 +47,20 @@ if (!['development', 'test', 'production'].includes(nodeEnv)) {
 }
 
 const databaseUrl = process.env.DATABASE_URL?.trim() || '';
+if (nodeEnv !== 'test' && databaseUrl) {
+  let parsedDatabaseUrl;
+  try {
+    parsedDatabaseUrl = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
+  }
+  if (!['postgres:', 'postgresql:'].includes(parsedDatabaseUrl.protocol)) {
+    throw new Error('DATABASE_URL must use the postgres:// or postgresql:// scheme.');
+  }
+  if (!parsedDatabaseUrl.username || !parsedDatabaseUrl.password) {
+    throw new Error('DATABASE_URL must include a PostgreSQL username and password.');
+  }
+}
 const databaseConfig = nodeEnv === 'test'
   ? {}
   : databaseUrl
@@ -60,6 +74,12 @@ const databaseConfig = nodeEnv === 'test'
       };
 if (nodeEnv !== 'test' && !databaseUrl && (!databaseConfig.database || !databaseConfig.user)) {
   throw new Error('Set DATABASE_URL or PGDATABASE and PGUSER in backend/.env to configure PostgreSQL.');
+}
+if (nodeEnv !== 'test' && !databaseUrl && typeof databaseConfig.password !== 'string') {
+  throw new Error('Set PGPASSWORD in backend/.env to configure PostgreSQL authentication.');
+}
+if (nodeEnv !== 'test' && !databaseUrl && databaseConfig.password.length === 0) {
+  throw new Error('PGPASSWORD must not be empty.');
 }
 
 const host = process.env.HOST || '127.0.0.1';

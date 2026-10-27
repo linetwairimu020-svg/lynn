@@ -107,15 +107,21 @@ test('initializes empty JSON data files without exposing a public data path', as
 });
 
 test('registers an ordinary user and returns no credential material', async () => {
-  const result = await postWithCsrf('/api/auth/register', { ...newUser, phone: '+1 (555) 123-4567' }, new Map());
+  const jar = new Map();
+  const result = await postWithCsrf('/api/auth/register', { ...newUser, phone: '+1 (555) 123-4567' }, jar);
   assert.equal(result.response.status, 201);
   assert.deepEqual(Object.keys(result.body.user).sort(), [
     'avatarUrl', 'createdAt', 'email', 'firstName', 'id', 'integrations',
-    'lastLoginAt', 'lastName', 'location', 'name', 'preferences', 'role',
+    'lastLoginAt', 'lastName', 'location', 'name', 'preferences', 'role', 'sessionStartedAt',
   ]);
   assert.equal(result.body.user.email, newUser.email);
   assert.equal(result.body.user.role, 'user');
   assert.equal('phone' in result.body.user, false);
+  assert.ok(result.body.csrfToken);
+  assert.ok(jar.has('lynn.sid'));
+  const currentUser = await request('/api/auth/me', jar);
+  assert.equal(currentUser.response.status, 200);
+  assert.equal(currentUser.body.user.email, newUser.email);
   const stored = JSON.parse(await readFile(path.join(dataDir, 'users.json'), 'utf8'));
   assert.equal(stored.length, 1);
   assert.equal(stored[0].emailNormalized, newUser.email.toLowerCase());
@@ -193,9 +199,10 @@ test('rejects state-changing requests without a matching CSRF token', async () =
   assert.equal(result.body.error.code, 'CSRF_INVALID');
 });
 
-test('returns the authenticated user from /me and requires a valid session', async () => {
+test('returns the authenticated user from /me or null when signed out', async () => {
   const anonymous = await request('/api/auth/me');
-  assert.equal(anonymous.response.status, 401);
+  assert.equal(anonymous.response.status, 200);
+  assert.equal(anonymous.body.user, null);
 
   const loginJar = new Map();
   await postWithCsrf('/api/auth/login', { email: newUser.email, password: newUser.password }, loginJar);
@@ -317,7 +324,8 @@ test('password reset emails a single-use token, updates the password, and revoke
     assert.equal(replay.body.error.code, 'INVALID_RESET_TOKEN');
 
     const revokedSession = await request('/api/auth/me', jar);
-    assert.equal(revokedSession.response.status, 401);
+    assert.equal(revokedSession.response.status, 200);
+    assert.equal(revokedSession.body.user, null);
     const updatedUser = await userStore.findUserByEmail(resetUser.email);
     assert.equal(await argon2.verify(updatedUser.passwordHash, resetUser.password), false);
     assert.equal(await argon2.verify(updatedUser.passwordHash, 'NewSecurePassword456'), true);
@@ -373,7 +381,8 @@ test('denies ordinary users and safely provisions an existing account without ch
   assert.equal(JSON.stringify(storedUsers).includes(adminPassword), false);
 
   const revokedSession = await request('/api/auth/me', adminJar);
-  assert.equal(revokedSession.response.status, 401);
+  assert.equal(revokedSession.response.status, 200);
+  assert.equal(revokedSession.body.user, null);
 
   const refreshedAdminJar = new Map();
   await postWithCsrf('/api/auth/login', { email: existingAdminAccount.email, password: adminPassword }, refreshedAdminJar);
@@ -402,7 +411,8 @@ test('logout deletes the server session and clears both cookies', async () => {
   assert.equal(jar.has('lynn.sid'), false);
   assert.equal(jar.has('lynn.csrf'), false);
   const anonymous = await request('/api/auth/me', jar);
-  assert.equal(anonymous.response.status, 401);
+  assert.equal(anonymous.response.status, 200);
+  assert.equal(anonymous.body.user, null);
 });
 
 test('refuses to overwrite corrupted user data', async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import useAuth from '../hooks/useAuth';
@@ -34,6 +34,7 @@ function formatDuration(startedAt, now) {
 
 export default function AccountDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
   const [preferences, setPreferences] = useState(user.preferences);
   const [regionDraft, setRegionDraft] = useState(user.preferences.region);
@@ -81,6 +82,7 @@ export default function AccountDashboard() {
     setError('');
     try {
       await logout();
+      navigate('/login', { replace: true });
     } catch (logoutError) {
       setError(logoutError.message);
     }
@@ -94,7 +96,7 @@ export default function AccountDashboard() {
     <main className="container py-5">
       <div className="account-heading">
         <div><p className="eyebrow"><span /> Your workspace</p><h1 className="h2 serif-title">Account dashboard</h1><p className="text-secondary">Your profile, session, and saved preferences.</p></div>
-        <button className="btn btn-outline-dark" type="button" onClick={() => void handleLogout()}>Sign out</button>
+        <button className="btn btn-outline-dark" type="button" onClick={() => void handleLogout()}>Sign Out</button>
       </div>
       {(error || message) && <p className={`alert ${error ? 'alert-warning' : 'alert-success'}`} role={error ? 'alert' : 'status'}>{error || message}</p>}
       <div className="account-grid">

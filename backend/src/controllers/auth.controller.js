@@ -43,8 +43,15 @@ export async function issueCsrf(request, response) {
 export async function register(request, response) {
   const details = validateRegistration(request.body);
   const passwordHash = await argon2.hash(details.password, { type: argon2.argon2id });
-  const user = await createUser({ ...details, passwordHash });
-  response.status(201).json({ user: toPublicUser(user) });
+  const createdUser = await createUser({ ...details, passwordHash });
+  const lastLoginAt = new Date().toISOString();
+  const user = await updateLastLogin(createdUser.id, lastLoginAt);
+  const session = await createSession(user.id);
+  setAuthCookies(response, session.token, session.csrfToken, sessionCookieMaxAge());
+  response.status(201).json({
+    user: toPublicUser(user, session.createdAt),
+    csrfToken: session.csrfToken,
+  });
 }
 
 export async function login(request, response) {
@@ -67,7 +74,8 @@ export async function currentUser(request, response) {
   const user = session ? await findUserById(session.userId) : null;
   if (!session || !user) {
     clearAuthCookies(response);
-    throw new HttpError(401, 'AUTHENTICATION_REQUIRED', 'Sign in to continue.');
+    response.json({ user: null });
+    return;
   }
   setCsrfCookie(response, session.csrfToken, sessionCookieMaxAge());
   response.json({ user: toPublicUser(user, session.createdAt), csrfToken: session.csrfToken });
