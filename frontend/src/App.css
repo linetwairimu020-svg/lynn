@@ -89,6 +89,8 @@ body { background: var(--cream); color: var(--ink); }
 .admin-sidebar a:hover, .admin-sidebar a.active { background: var(--blush); color: var(--plum); }
 .admin-sidebar a.active { font-weight: 700; }
 .admin-content { margin: 0 auto; max-width: 78rem; padding: clamp(1.25rem, 3vw, 2.5rem); width: 100%; }
+.admin-summary-grid { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+.admin-summary-item { flex: 0 1 clamp(9rem, 25vw, 18rem); max-width: 18rem; min-width: 0; }
 .admin-summary-card { background: #fff; border: 1px solid #ebe4e1; border-radius: .9rem; color: inherit; display: grid; gap: .6rem; min-height: 8rem; padding: 1.2rem; }
 .admin-summary-card:hover { border-color: var(--coral); box-shadow: 0 .4rem 1rem rgba(55,29,53,.08); color: var(--plum); transform: translateY(-2px); }
 .admin-summary-card > i { color: var(--coral); font-size: 1.2rem; }
