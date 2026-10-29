@@ -62,7 +62,7 @@ test('registration opens the dashboard and profile sign-out returns to login', a
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
 
   await page.getByLabel('Email address').fill(user.email);
-  await page.getByLabel('Password').fill('SecurePassword123!');
+  await page.getByLabel('Password', { exact: true }).fill('SecurePassword123!');
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page).toHaveURL(/\/account\/?$/);

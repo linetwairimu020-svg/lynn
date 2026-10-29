@@ -83,6 +83,24 @@ export async function initializeContentStore() {
         async () => ({ value: undefined, changed: false }),
       )),
   ]);
+  const whatsappLink = arrayDefinitions['social-links'].defaults.find(
+    (link) => link.id === 'whatsapp',
+  );
+  await withDocumentArray(
+    'social-links.json',
+    (records) => validateRecords('social-links', records),
+    async (records) => {
+      if (records.some((record) => record.id === 'whatsapp' || record.platform === 'whatsapp')) {
+        return { value: undefined, changed: false };
+      }
+      return {
+        value: undefined,
+        records: [...records, whatsappLink],
+        changed: true,
+      };
+    },
+    arrayDefinitions['social-links'].defaults,
+  );
 }
 
 export async function listContent(collection, { publishedOnly = false } = {}) {

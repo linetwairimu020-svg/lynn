@@ -322,6 +322,19 @@ test('protected singleton and social-link APIs persist settings and visibility',
   assert.equal((await request('/api/admin/social-links', ordinaryJar)).response.status, 403);
 });
 
+test('content initialization adds the WhatsApp social link when it is missing', async () => {
+  const linksBefore = await contentStore.listContent('social-links');
+  for (const link of linksBefore.filter((item) => item.id === 'whatsapp' || item.platform === 'whatsapp')) {
+    await contentStore.deleteContent('social-links', link.id);
+  }
+
+  await contentStore.initializeContentStore();
+
+  const links = await contentStore.listContent('social-links');
+  assert.equal(links.filter((item) => item.id === 'whatsapp' || item.platform === 'whatsapp').length, 1);
+  assert.equal(links.find((item) => item.id === 'whatsapp')?.url, 'https://web.whatsapp.com/#!');
+});
+
 test('contact messages validate public submissions and remain admin-only', async () => {
   assert.equal((await request('/api/admin/messages')).response.status, 401);
   assert.equal((await request('/api/admin/messages', ordinaryJar)).response.status, 403);

@@ -1,19 +1,29 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
-import Home from './pages/Home';
-import BakeryShop from './pages/BakeryShop';
-import Haven from './pages/Haven';
-import NotFound from './pages/NotFound';
-import HardwareShop from './pages/HardwareShop';
-import ProductDetails from './pages/ProductDetails';
-import AuthPage from './pages/AuthPage';
-import AdminDashboard from './pages/AdminDashboard';
 import AdminRoute from './routes/AdminRoute';
 import AccountRoute from './routes/AccountRoute';
-import AccountDashboard from './pages/AccountDashboard';
-import PasswordResetPage from './pages/PasswordResetPage';
 import useContent from './hooks/useContent';
+
+const Home = lazy(() => import('./pages/Home'));
+const BakeryShop = lazy(() => import('./pages/BakeryShop'));
+const Haven = lazy(() => import('./pages/Haven'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const HardwareShop = lazy(() => import('./pages/HardwareShop'));
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AccountDashboard = lazy(() => import('./pages/AccountDashboard'));
+const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
+
+function PageLoading() {
+  return (
+    <div className="d-flex min-vh-100 align-items-center justify-content-center" role="status">
+      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+      <span>Loading...</span>
+    </div>
+  );
+}
 
 function PageMetadata() {
   const { pathname, search } = useLocation();
@@ -96,23 +106,25 @@ export default function App() {
       <ScrollToTop />
       <PageMetadata />
       <ContentStoreStatusGate />
-      <Routes>
-        <Route path="/" element={<SharedEntry />} />
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<AuthPage />} />
-        <Route path="/forgot-password" element={<PasswordResetPage />} />
-        <Route path="/reset-password" element={<PasswordResetPage reset />} />
-        <Route path="/account" element={<AccountRoute><AccountDashboard /></AccountRoute>} />
-        <Route path="/about" element={<Home />} />
-        <Route path="/projects" element={<Navigate to="/#work" replace />} />
-        <Route path="/contact" element={<Home />} />
-        <Route path="/bakery" element={<BakeryShop />} />
-        <Route path="/haven" element={<Haven />} />
-        <Route path="/hardware" element={<HardwareShop />} />
-        <Route path="/hardware/product/:id" element={<ProductDetails />} />
-        <Route path="/admin/*" element={<LegacyAdminRedirect />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/" element={<SharedEntry />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage />} />
+          <Route path="/forgot-password" element={<PasswordResetPage />} />
+          <Route path="/reset-password" element={<PasswordResetPage reset />} />
+          <Route path="/account" element={<AccountRoute><AccountDashboard /></AccountRoute>} />
+          <Route path="/about" element={<Home />} />
+          <Route path="/projects" element={<Navigate to="/#work" replace />} />
+          <Route path="/contact" element={<Home />} />
+          <Route path="/bakery" element={<BakeryShop />} />
+          <Route path="/haven" element={<Haven />} />
+          <Route path="/hardware" element={<HardwareShop />} />
+          <Route path="/hardware/product/:id" element={<ProductDetails />} />
+          <Route path="/admin/*" element={<LegacyAdminRedirect />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </>
   );
 }
