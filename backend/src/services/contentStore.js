@@ -158,7 +158,31 @@ export async function setMessageRead(id, read) {
   return withDocumentArray('messages.json', (records) => validateRecords('messages', records), async (items) => {
     const index = items.findIndex((item) => item.id === id);
     if (index < 0) throw new HttpError(404, 'MESSAGE_NOT_FOUND', 'The requested message does not exist.');
-    const updated = { ...items[index], read, updatedAt: new Date().toISOString() };
+    const updated = {
+      ...items[index],
+      read,
+      status: items[index].reply ? 'replied' : read ? 'read' : 'unread',
+      updatedAt: new Date().toISOString(),
+    };
+    const records = [...items];
+    records[index] = updated;
+    return { value: updated, records, changed: true };
+  }, arrayDefinitions.messages.defaults);
+}
+
+export async function replyToMessage(id, reply) {
+  return withDocumentArray('messages.json', (records) => validateRecords('messages', records), async (items) => {
+    const index = items.findIndex((item) => item.id === id);
+    if (index < 0) throw new HttpError(404, 'MESSAGE_NOT_FOUND', 'The requested message does not exist.');
+    const repliedAt = new Date().toISOString();
+    const updated = {
+      ...items[index],
+      reply,
+      repliedAt,
+      read: true,
+      status: 'replied',
+      updatedAt: repliedAt,
+    };
     const records = [...items];
     records[index] = updated;
     return { value: updated, records, changed: true };
@@ -191,6 +215,9 @@ export async function createContactMessage(details) {
     ...details,
     id: randomUUID(),
     read: false,
+    reply: null,
+    repliedAt: null,
+    status: 'unread',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

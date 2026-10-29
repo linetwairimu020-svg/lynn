@@ -7,6 +7,7 @@ import {
   deleteAdminContent,
   getAdminContent,
   getAdminOverview,
+  replyToAdminMessage,
   updateAdminContent,
   updateAdminMessage,
   updateAdminSingleton,
@@ -36,6 +37,7 @@ for (const name of ['profile', 'settings']) {
 }
 adminRouter.get('/:name', asyncRoute(getAdminContent));
 adminRouter.post('/:name', asyncRoute(createAdminContent));
+adminRouter.post('/messages/:id/reply', asyncRoute(replyToAdminMessage));
 adminRouter.patch('/messages/:id', asyncRoute(updateAdminMessage));
 adminRouter.put('/:name/:id', asyncRoute(updateAdminContent));
 adminRouter.delete('/:name/:id', asyncRoute(deleteAdminContent));

@@ -6,11 +6,16 @@ import {
   getOverview,
   getSingleton,
   listContent,
+  replyToMessage,
   setMessageRead,
   updateContent,
   updateSingleton,
 } from '../services/contentStore.js';
-import { validateMessageInput, validateMessageUpdate } from '../services/contentValidation.js';
+import {
+  validateMessageInput,
+  validateMessageReply,
+  validateMessageUpdate,
+} from '../services/contentValidation.js';
 
 const publicCollections = new Set(['projects', 'services', 'skills', 'social-links']);
 const managedCollections = new Set(['projects', 'services', 'skills', 'social-links', 'messages']);
@@ -87,4 +92,9 @@ export async function submitContactMessage(request, response) {
 export async function updateAdminMessage(request, response) {
   const { read } = validateMessageUpdate(request.body);
   response.json({ content: await setMessageRead(request.params.id, read) });
+}
+
+export async function replyToAdminMessage(request, response) {
+  const { reply } = validateMessageReply(request.body);
+  response.json({ content: await replyToMessage(request.params.id, reply) });
 }

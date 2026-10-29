@@ -131,9 +131,22 @@ export function validateMessageInput(body) {
 
 export function validateStoredRecord(collection, record) {
   if (collection === 'messages') {
-    const { id, createdAt, updatedAt, read, ...details } = record;
+    const {
+      id, createdAt, updatedAt, read, reply, repliedAt, status, ...details
+    } = record;
     validateMessageInput(details);
     if (typeof read !== 'boolean') throw new Error('messages.json contains an invalid message record.');
+    if (reply !== undefined && reply !== null
+      && (typeof reply !== 'string' || reply.length > 5000)) {
+      throw new Error('messages.json contains an invalid message reply.');
+    }
+    if (repliedAt !== undefined && repliedAt !== null
+      && (typeof repliedAt !== 'string' || !Number.isFinite(Date.parse(repliedAt)))) {
+      throw new Error('messages.json contains an invalid reply timestamp.');
+    }
+    if (status !== undefined && !['unread', 'read', 'replied'].includes(status)) {
+      throw new Error('messages.json contains an invalid message status.');
+    }
     return;
   }
   const { id, createdAt, updatedAt, ...details } = record;
@@ -144,4 +157,9 @@ export function validateMessageUpdate(body) {
   checkKeys(body, ['read'], ['read']);
   if (typeof body.read !== 'boolean') invalid('Read must be true or false.');
   return { read: body.read };
+}
+
+export function validateMessageReply(body) {
+  checkKeys(body, ['reply'], ['reply']);
+  return { reply: cleanText(body.reply, 'Reply', { required: true, max: 5000 }) };
 }

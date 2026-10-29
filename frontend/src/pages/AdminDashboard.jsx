@@ -6,6 +6,7 @@ import { logout } from '../services/authService';
 import { apiService } from '../services/apiService';
 import { notifyContentChanged } from '../services/contentEvents';
 import { safeExternalUrl } from '../utils/urls';
+import ContentOverviewChart from '../components/ContentOverviewChart';
 
 const navigation = [
   ['Overview', 'overview', 'bi-grid'],
@@ -120,7 +121,7 @@ function AdminOverview() {
   return <section><p className="eyebrow"><span /> Admin dashboard</p><h1 className="h2 serif-title">Content overview</h1><p className="text-secondary">Portfolio content and contact messages stored by the backend.</p>
     {error && <p className="alert alert-warning" role="alert">{error}</p>}
     {loading && <p className="text-secondary" role="status">Loading dashboard data…</p>}
-    <div className="admin-summary-grid mt-3">{navigation.slice(1, 5).map(([label, section, icon]) => <div className="admin-summary-item" key={section}><Link className="admin-summary-card" to={adminUrl(section)}><i className={`bi ${icon}`} aria-hidden="true" /><span>{label}</span><strong>{overview?.counts?.[label.toLowerCase()] ?? '—'}</strong></Link></div>)}<div className="admin-summary-item"><Link className="admin-summary-card" to={adminUrl('messages')}><i className="bi bi-envelope" aria-hidden="true" /><span>Messages</span><strong>{overview?.counts?.messages ?? '—'}</strong></Link></div></div>
+    {!loading && !error && <ContentOverviewChart stats={overview?.counts} />}
     {overview?.recentActivity?.length > 0 && <section className="mt-4" aria-labelledby="recent-activity-heading"><h2 className="h5" id="recent-activity-heading">Recent activity</h2><ul className="list-group">{overview.recentActivity.map((activity) => <li className="list-group-item d-flex justify-content-between gap-3" key={`${activity.type}-${activity.id}`}><span>{activity.type === 'message' ? 'Received message' : `Updated ${activity.type}`}: {activity.label}</span><time className="small text-secondary" dateTime={activity.at}>{new Date(activity.at).toLocaleString()}</time></li>)}</ul></section>}
     <div className="preview-notice mt-4"><strong>Administrator access is verified by the server</strong><p className="small mb-0">Dashboard data is stored in private backend JSON files. This storage is intended for development or deployments running a single backend process.</p></div>
   </section>;
@@ -155,12 +156,18 @@ function ContentManager({ page }) {
   const [notice, setNotice] = useState({ kind: '', text: '' });
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const [replyingId, setReplyingId] = useState(null);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [messageOverrides, setMessageOverrides] = useState({});
 
   useEffect(() => {
     setEditingId(null);
     setDraft(null);
     setSearch('');
     setNotice({ kind: '', text: '' });
+    setReplyingId(null);
+    setReplyDraft('');
+    setMessageOverrides({});
   }, [page]);
 
   useEffect(() => {
@@ -177,10 +184,31 @@ function ContentManager({ page }) {
       setBusy(true);
       setNotice({ kind: '', text: '' });
       try {
-        await apiService.admin.updateMessage(item.id, read);
+        const result = await apiService.admin.updateMessage(item.id, read);
+        setMessageOverrides((current) => ({ ...current, [item.id]: result.content }));
         notifyContentChanged();
         await refresh().catch(() => {});
         setNotice({ kind: 'success', text: 'Message status updated.' });
+      } catch (error) {
+        setNotice({ kind: 'error', text: error.message });
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    };
+    const sendReply = async (item) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setBusy(true);
+      setNotice({ kind: '', text: '' });
+      try {
+        const result = await apiService.admin.replyToMessage(item.id, replyDraft);
+        setMessageOverrides((current) => ({ ...current, [item.id]: result.content }));
+        notifyContentChanged();
+        await refresh().catch(() => {});
+        setReplyingId(null);
+        setReplyDraft('');
+        setNotice({ kind: 'success', text: 'Reply saved to the message.' });
       } catch (error) {
         setNotice({ kind: 'error', text: error.message });
       } finally {
@@ -210,7 +238,63 @@ function ContentManager({ page }) {
       {notice.text && <p className={`alert ${notice.kind === 'error' ? 'alert-warning' : 'alert-success'}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
       {loading && <p className="text-secondary" role="status">Loading contact messages…</p>}
       {!loading && !loadError && items.length === 0 && <div className="empty-state mt-4"><i className="bi bi-inbox" aria-hidden="true" /><h2 className="h5">No messages yet</h2><p className="mb-0">Messages submitted through the portfolio contact form will appear here.</p></div>}
-      {!loadError && items.length > 0 && <div className="admin-list mt-4">{[...items].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map((item) => <article className="admin-list-item" key={item.id}><div className="flex-grow-1"><div className="d-flex flex-wrap align-items-center gap-2"><h2 className="h5 mb-0">{item.subject}</h2><span className={`badge ${item.read ? 'text-bg-secondary' : 'text-bg-primary'}`}>{item.read ? 'Read' : 'Unread'}</span></div><p className="small text-secondary mb-2 mt-2">{item.name} · <a href={`mailto:${item.email}`}>{item.email}</a> · <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></p><p className="mb-0 text-break">{item.message}</p></div><div className="d-flex flex-wrap gap-2 align-self-start"><button className="btn btn-sm btn-outline-dark" type="button" disabled={busy} onClick={() => updateMessage(item, !item.read)}>{item.read ? 'Mark unread' : 'Mark read'}</button><button className="btn btn-sm btn-outline-danger" type="button" disabled={busy} onClick={() => deleteMessage(item)}>Delete</button></div></article>)}</div>}
+      {!loadError && items.length > 0 && <div className="admin-list mt-4">
+        {[...items].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map((record) => {
+          const item = messageOverrides[record.id] || record;
+          const isReplied = item.status === 'replied' || Boolean(item.reply);
+          const isReplying = replyingId === item.id;
+          return <article className="admin-list-item" key={item.id}>
+            <div className="flex-grow-1">
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <h2 className="h5 mb-0">{item.subject}</h2>
+                <span className={`badge ${isReplied ? 'text-bg-success' : item.read ? 'text-bg-secondary' : 'text-bg-primary'}`}>
+                  {isReplied ? 'Replied' : item.read ? 'Read' : 'Unread'}
+                </span>
+              </div>
+              <p className="small text-secondary mb-2 mt-2">{item.name} · <a href={`mailto:${item.email}`}>{item.email}</a> · <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></p>
+              <p className="mb-0 text-break">{item.message}</p>
+              {item.reply && <div className="alert alert-light border mt-3 mb-0">
+                <strong>Your reply</strong>
+                <p className="mb-1 mt-2 text-break">{item.reply}</p>
+                {item.repliedAt && <small className="text-secondary"><time dateTime={item.repliedAt}>{new Date(item.repliedAt).toLocaleString()}</time></small>}
+              </div>}
+              {isReplying && <form className="mt-3" onSubmit={(event) => { event.preventDefault(); sendReply(item); }}>
+                <label className="form-label" htmlFor={`reply-${item.id}`}>Reply</label>
+                <textarea
+                  className="form-control"
+                  id={`reply-${item.id}`}
+                  value={replyDraft}
+                  onChange={(event) => setReplyDraft(event.target.value)}
+                  maxLength={5000}
+                  required
+                  rows={4}
+                  disabled={busy}
+                />
+                <div className="d-flex gap-2 mt-2">
+                  <button className="btn btn-sm btn-primary" type="submit" disabled={busy || !replyDraft.trim()}>
+                    {busy ? 'Sending…' : 'Send Reply'}
+                  </button>
+                  <button className="btn btn-sm btn-outline-secondary" type="button" disabled={busy} onClick={() => { setReplyingId(null); setReplyDraft(''); }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>}
+            </div>
+            <div className="d-flex flex-wrap gap-2 align-self-start">
+              <button
+                className="btn btn-sm btn-outline-primary"
+                type="button"
+                disabled={busy}
+                onClick={() => { setReplyingId(isReplying ? null : item.id); setReplyDraft(''); }}
+              >
+                {isReplying ? 'Cancel reply' : 'Reply'}
+              </button>
+              <button className="btn btn-sm btn-outline-dark" type="button" disabled={busy} onClick={() => updateMessage(item, !item.read)}>{item.read ? 'Mark unread' : 'Mark read'}</button>
+              <button className="btn btn-sm btn-outline-danger" type="button" disabled={busy} onClick={() => deleteMessage(item)}>Delete</button>
+            </div>
+          </article>;
+        })}
+      </div>}
     </section>;
   }
 

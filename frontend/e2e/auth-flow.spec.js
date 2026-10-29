@@ -41,6 +41,10 @@ test('registration opens the dashboard and profile sign-out returns to login', a
 
   await page.goto('/register');
   await expect(page.getByRole('heading', { name: 'Register a New Account.' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'LW' })).toBeVisible();
+  const registrationPage = page.locator('.register-page');
+  await expect.poll(() => registrationPage.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain('registration-desk-background');
+  await expect.poll(() => registrationPage.evaluate((element) => getComputedStyle(element.querySelector('.register-card')).backdropFilter)).toContain('blur');
   await expect(page.getByText('Your space, your way')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'A clearer view of what’s ahead.' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'User Profile Preview' })).toHaveCount(0);
@@ -60,6 +64,13 @@ test('registration opens the dashboard and profile sign-out returns to login', a
 
   await expect(page).toHaveURL(/\/login\/?$/);
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Portfolio' })).toBeVisible();
+  await expect(page.getByText('Create with grace. Build your place.')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'LW' })).toHaveCount(2);
+  await expect(page.locator('.login-network-image')).toBeVisible();
+  await expect.poll(() => page.locator('.login-network-image').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByText('John Doe')).toHaveCount(0);
+  await expect(page.getByPlaceholder('Reply to John Doe...')).toHaveCount(0);
 
   await page.getByLabel('Email address').fill(user.email);
   await page.getByLabel('Password', { exact: true }).fill('SecurePassword123!');

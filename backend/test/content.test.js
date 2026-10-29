@@ -367,10 +367,42 @@ test('contact messages validate public submissions and remain admin-only', async
   assert.equal(markedRead.response.status, 200);
   assert.equal(markedRead.body.content.read, true);
 
+  const replyAsOrdinaryUser = await postWithCsrf(
+    `/api/admin/messages/${message.id}/reply`,
+    { reply: 'This should be forbidden.' },
+    ordinaryJar,
+  );
+  assert.equal(replyAsOrdinaryUser.response.status, 403);
+
+  const invalidReply = await postWithCsrf(
+    `/api/admin/messages/${message.id}/reply`,
+    { reply: '   ' },
+    adminJar,
+  );
+  assert.equal(invalidReply.response.status, 400);
+
+  const sentReply = await postWithCsrf(
+    `/api/admin/messages/${message.id}/reply`,
+    { reply: 'Thank you for reaching out.' },
+    adminJar,
+  );
+  assert.equal(sentReply.response.status, 200);
+  assert.equal(sentReply.body.content.reply, 'Thank you for reaching out.');
+  assert.equal(sentReply.body.content.status, 'replied');
+  assert.equal(sentReply.body.content.read, true);
+  assert.ok(Number.isFinite(Date.parse(sentReply.body.content.repliedAt)));
+
+  const markedUnread = await mutateWithCsrf(`/api/admin/messages/${message.id}`, 'PATCH', { read: false }, adminJar);
+  assert.equal(markedUnread.response.status, 200);
+  assert.equal(markedUnread.body.content.read, false);
+  assert.equal(markedUnread.body.content.status, 'replied');
+
   const deleted = await mutateWithCsrf(`/api/admin/messages/${message.id}`, 'DELETE', undefined, adminJar);
   assert.equal(deleted.response.status, 204);
   const missing = await mutateWithCsrf(`/api/admin/messages/${message.id}`, 'PATCH', { read: false }, adminJar);
   assert.equal(missing.response.status, 404);
+  const missingReply = await postWithCsrf(`/api/admin/messages/${message.id}/reply`, { reply: 'No message.' }, adminJar);
+  assert.equal(missingReply.response.status, 404);
 });
 
 test('concurrent writes retain every created record and content survives server restart', async () => {

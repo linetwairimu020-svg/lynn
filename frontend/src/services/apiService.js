@@ -94,6 +94,7 @@ export const apiService = {
     authorize: () => request('/admin/access'),
     overview: () => request('/admin/overview'),
     updateMessage: (id, read) => requestWithCsrf(`/admin/messages/${encodeURIComponent(id)}`, json('PATCH', { read })),
+    replyToMessage: (id, reply) => requestWithCsrf(`/admin/messages/${encodeURIComponent(id)}/reply`, json('POST', { reply })),
   },
   content: {
     list: (collection) => request(collectionPath(collection)),
