@@ -10,8 +10,8 @@ export default function useContent(name, { admin = false } = {}) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const result = admin
         ? await apiService.content.list(name)
@@ -24,7 +24,7 @@ export default function useContent(name, { admin = false } = {}) {
       if (!admin) setContent(defaults);
       throw readError;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [admin, defaults, name]);
 

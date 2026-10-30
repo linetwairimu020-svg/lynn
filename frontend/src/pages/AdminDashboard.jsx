@@ -171,6 +171,24 @@ function ContentManager({ page }) {
   }, [page]);
 
   useEffect(() => {
+    if (page !== 'messages') return undefined;
+    let refreshing = false;
+    const refreshMessages = () => {
+      if (document.visibilityState !== 'visible' || refreshing) return;
+      refreshing = true;
+      refresh({ silent: true })
+        .catch(() => {})
+        .finally(() => { refreshing = false; });
+    };
+    const intervalId = window.setInterval(refreshMessages, 3000);
+    document.addEventListener('visibilitychange', refreshMessages);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshMessages);
+    };
+  }, [page, refresh]);
+
+  useEffect(() => {
     if (objectConfig && !loading && !loadError && content && !draft) setDraft({ ...content });
   }, [content, draft, loadError, loading, objectConfig]);
 

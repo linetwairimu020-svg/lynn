@@ -92,7 +92,7 @@ export default function AccountDashboard() {
   const activeIntegrations = connectedProviders.filter(([provider]) => integrationProviders.has(provider));
 
   return <div className="account-page">
-    <Navbar links={[{ label: 'Home', href: '/' }, { label: 'My Account', to: '/account' }]} />
+    <Navbar links={[{ label: 'Home', href: '/' }]} />
     <main className="container py-5">
       <div className="account-heading">
         <div><p className="eyebrow"><span /> Your workspace</p><h1 className="h2 serif-title">Account dashboard</h1><p className="text-secondary">Your profile, session, and saved preferences.</p></div>

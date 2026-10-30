@@ -20,7 +20,7 @@ export default function AuthPage() {
       <main className="login-main">
         <section className="login-brand-panel" aria-label="Linet Wairimu portfolio administration">
           <div className="login-brand-message">
-            <img className="login-network-image" src={loginLogo} alt="LW" />
+            <span className="login-brand-mark" role="img" aria-label="LW">LW</span>
             <p className="login-brand-tagline">Create with grace. Build your place.</p>
             <p className="login-brand-caption">Portfolio admin.</p>
           </div>
@@ -30,7 +30,7 @@ export default function AuthPage() {
         <section className="login-content-panel" aria-label="Sign in">
           <div className="login-layout">
             <section className="auth-card register-card login-card" aria-labelledby="login-heading">
-              <img className="login-card-logo" src={loginLogo} alt="LW" />
+              <span className="login-card-mark" role="img" aria-label="LW">LW</span>
               <Login embedded />
             </section>
           </div>
