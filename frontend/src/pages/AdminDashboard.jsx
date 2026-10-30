@@ -145,6 +145,376 @@ function Field({ field, value, onChange }) {
     : <input {...common} className="form-control" />}</div>;
 }
 
+const settingsSections = [
+  { id: 'account', label: 'Account & Security' },
+  { id: 'general', label: 'General' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'data', label: 'Data & Integrations' },
+];
+
+const initialSessions = [
+  { id: 's1', device: 'Chrome on Windows', ip: '172.16.0.24', location: 'Nairobi, KE', lastActive: '2 minutes ago' },
+  { id: 's2', device: 'Safari on iPhone', ip: '172.16.0.88', location: 'Nairobi, KE', lastActive: '1 hour ago' },
+  { id: 's3', device: 'Firefox on Ubuntu', ip: '172.16.0.12', location: 'Remote', lastActive: '3 days ago' },
+];
+
+function SettingsManager() {
+  const { content, error: loadError, loading, refresh } = useContent('settings', { admin: true });
+  const [section, setSection] = useState('account');
+  const [form, setForm] = useState({
+    siteTitle: 'Linet Wairimu | Developer & Designer',
+    notice: 'Portfolio content preview',
+    seoTitle: 'Linet Wairimu | Developer & Designer',
+    defaultMetaDescription: 'Developer and designer creating thoughtful digital experiences.',
+    ogImageUrl: '',
+    adminDisplayName: 'Linet Wairimu',
+    adminEmail: 'hello@linetwairimu.com',
+    adminUsername: 'linetwairimu',
+    contactEmail: 'hello@linetwairimu.com',
+    emailNotifications: true,
+    maintenanceMode: false,
+    maintenanceMessage: 'We are making a few updates. Please check back soon.',
+    defaultTheme: 'system',
+    accentColor: '#d87968',
+    twoFactorEnabled: false,
+    analyticsId: '',
+    resumeFileName: 'Linet-Wairimu-CV.pdf',
+    resumeUpdatedAt: '2026-10-30',
+  });
+  const [notice, setNotice] = useState({ kind: '', text: '' });
+  const [busy, setBusy] = useState(false);
+  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
+  const [showPasswords, setShowPasswords] = useState({ current: false, next: false, confirm: false });
+  const [sessions, setSessions] = useState(initialSessions);
+
+  useEffect(() => {
+    if (content) {
+      setForm((current) => ({
+        siteTitle: 'Linet Wairimu | Developer & Designer',
+        notice: 'Portfolio content preview',
+        seoTitle: 'Linet Wairimu | Developer & Designer',
+        defaultMetaDescription: 'Developer and designer creating thoughtful digital experiences.',
+        ogImageUrl: '',
+        adminDisplayName: 'Linet Wairimu',
+        adminEmail: 'hello@linetwairimu.com',
+        adminUsername: 'linetwairimu',
+        contactEmail: 'hello@linetwairimu.com',
+        emailNotifications: true,
+        maintenanceMode: false,
+        maintenanceMessage: 'We are making a few updates. Please check back soon.',
+        defaultTheme: 'system',
+        accentColor: '#d87968',
+        twoFactorEnabled: false,
+        analyticsId: '',
+        resumeFileName: 'Linet-Wairimu-CV.pdf',
+        resumeUpdatedAt: '2026-10-30',
+        ...content,
+        ...current,
+      }));
+    }
+  }, [content]);
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const saveSettings = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setNotice({ kind: '', text: '' });
+    try {
+      const payload = {
+        ...form,
+        siteTitle: form.siteTitle || content?.siteTitle || 'Linet Wairimu | Developer & Designer',
+        notice: form.notice || content?.notice || 'Portfolio content preview',
+      };
+      await apiService.content.updateSingleton('settings', payload);
+      await refresh().catch(() => {});
+      setNotice({ kind: 'success', text: 'Settings saved successfully.' });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasswordSubmit = (event) => {
+    event.preventDefault();
+    if (!passwords.current || !passwords.next || !passwords.confirm) {
+      setNotice({ kind: 'error', text: 'Please complete the password fields before updating.' });
+      return;
+    }
+    if (passwords.next.length < 8) {
+      setNotice({ kind: 'error', text: 'New password should be at least 8 characters long.' });
+      return;
+    }
+    if (passwords.next !== passwords.confirm) {
+      setNotice({ kind: 'error', text: 'The new password and confirmation do not match.' });
+      return;
+    }
+    setPasswords({ current: '', next: '', confirm: '' });
+    setShowPasswords({ current: false, next: false, confirm: false });
+    setNotice({ kind: 'success', text: 'Password updated locally in this demo. Connect the auth API to persist it in production.' });
+  };
+
+  const revokeSession = (id) => {
+    setSessions((current) => current.filter((session) => session.id !== id));
+    setNotice({ kind: 'success', text: 'The selected session has been revoked.' });
+  };
+
+  const accentOptions = ['#d87968', '#396c5a', '#3d4a5c', '#9a6d4f', '#6b7b6d'];
+
+  return <section className="settings-page">
+    <div className="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+      <div>
+        <p className="eyebrow"><span /> Settings</p>
+        <h1 className="h2 serif-title mb-1">Dashboard preferences</h1>
+        <p className="text-secondary mb-0">Manage your profile, visitor-facing defaults, and site configuration.</p>
+      </div>
+    </div>
+
+    {loadError && <p className="alert alert-warning" role="alert">Could not load the saved settings: {loadError}</p>}
+    {notice.text && <p className={`alert ${notice.kind === 'error' ? 'alert-warning' : 'alert-success'}`} role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
+    {loading && <p className="text-secondary" role="status">Loading settings…</p>}
+
+    {!loading && <div className="settings-shell">
+      <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+        {settingsSections.map(({ id, label }) => (
+          <button key={id} type="button" className={section === id ? 'settings-tab active' : 'settings-tab'} onClick={() => setSection(id)} role="tab" aria-selected={section === id}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="settings-body">
+        {section === 'account' && (
+          <div className="settings-stack">
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Profile credentials</h2>
+              </div>
+              <div className="settings-grid">
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="adminDisplayName">Display name</label>
+                  <input id="adminDisplayName" className="form-control" value={form.adminDisplayName || ''} onChange={(event) => updateField('adminDisplayName', event.target.value)} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label" htmlFor="adminUsername">Username</label>
+                  <input id="adminUsername" className="form-control" value={form.adminUsername || ''} onChange={(event) => updateField('adminUsername', event.target.value)} />
+                </div>
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="adminEmail">Email address</label>
+                  <input id="adminEmail" type="email" className="form-control" value={form.adminEmail || ''} onChange={(event) => updateField('adminEmail', event.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Password management</h2>
+              </div>
+              <form onSubmit={handlePasswordSubmit} className="settings-grid compact">
+                <div className="password-field">
+                  <label className="form-label" htmlFor="currentPassword">Current password</label>
+                  <div className="input-group">
+                    <input id="currentPassword" className="form-control" type={showPasswords.current ? 'text' : 'password'} value={passwords.current} onChange={(event) => setPasswords((current) => ({ ...current, current: event.target.value }))} />
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPasswords((current) => ({ ...current, current: !current.current }))}>{showPasswords.current ? 'Hide' : 'Show'}</button>
+                  </div>
+                </div>
+                <div className="password-field">
+                  <label className="form-label" htmlFor="newPassword">New password</label>
+                  <div className="input-group">
+                    <input id="newPassword" className="form-control" type={showPasswords.next ? 'text' : 'password'} value={passwords.next} onChange={(event) => setPasswords((current) => ({ ...current, next: event.target.value }))} />
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPasswords((current) => ({ ...current, next: !current.next }))}>{showPasswords.next ? 'Hide' : 'Show'}</button>
+                  </div>
+                </div>
+                <div className="password-field settings-span-2">
+                  <label className="form-label" htmlFor="confirmPassword">Confirm new password</label>
+                  <div className="input-group">
+                    <input id="confirmPassword" className="form-control" type={showPasswords.confirm ? 'text' : 'password'} value={passwords.confirm} onChange={(event) => setPasswords((current) => ({ ...current, confirm: event.target.value }))} />
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPasswords((current) => ({ ...current, confirm: !current.confirm }))}>{showPasswords.confirm ? 'Hide' : 'Show'}</button>
+                  </div>
+                </div>
+                <div className="settings-span-2 d-flex justify-content-end mt-2">
+                  <button className="btn btn-primary" type="submit">Update password</button>
+                </div>
+              </form>
+            </div>
+
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Two-factor authentication</h2>
+              </div>
+              <div className="settings-toggle-row">
+                <div>
+                  <strong>Authenticator app</strong>
+                  <p>{form.twoFactorEnabled ? 'Enabled for your account.' : 'Disabled for your account.'}</p>
+                </div>
+                <button type="button" className={form.twoFactorEnabled ? 'settings-toggle is-on' : 'settings-toggle'} onClick={() => updateField('twoFactorEnabled', !form.twoFactorEnabled)} aria-label="Toggle two-factor authentication">
+                  <span className="settings-toggle-thumb" />
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Active sessions</h2>
+              </div>
+              <div className="settings-session-list">
+                {sessions.map((sessionItem) => (
+                  <div key={sessionItem.id} className="settings-session-item">
+                    <div>
+                      <strong>{sessionItem.device}</strong>
+                      <p>{sessionItem.location} · {sessionItem.ip}</p>
+                    </div>
+                    <div className="settings-session-actions">
+                      <span>{sessionItem.lastActive}</span>
+                      <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => revokeSession(sessionItem.id)}>Revoke</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {section === 'general' && (
+          <div className="settings-stack">
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>SEO metadata defaults</h2>
+              </div>
+              <div className="settings-grid">
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="siteTitle">Site title</label>
+                  <input id="siteTitle" className="form-control" value={form.siteTitle || ''} onChange={(event) => updateField('siteTitle', event.target.value)} />
+                </div>
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="defaultMetaDescription">Default meta description</label>
+                  <textarea id="defaultMetaDescription" className="form-control" rows={3} value={form.defaultMetaDescription || ''} onChange={(event) => updateField('defaultMetaDescription', event.target.value)} />
+                </div>
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="seoTitle">SEO title</label>
+                  <input id="seoTitle" className="form-control" value={form.seoTitle || ''} onChange={(event) => updateField('seoTitle', event.target.value)} />
+                </div>
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="ogImageUrl">Open Graph image URL</label>
+                  <input id="ogImageUrl" className="form-control" value={form.ogImageUrl || ''} onChange={(event) => updateField('ogImageUrl', event.target.value)} placeholder="https://..." />
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Contact & notification preferences</h2>
+              </div>
+              <div className="settings-grid">
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="contactEmail">Forward contact submissions to</label>
+                  <input id="contactEmail" type="email" className="form-control" value={form.contactEmail || ''} onChange={(event) => updateField('contactEmail', event.target.value)} />
+                </div>
+                <div className="settings-toggle-row settings-span-2">
+                  <div>
+                    <strong>New message email notifications</strong>
+                    <p>Send alerts when a new project inquiry lands in the inbox.</p>
+                  </div>
+                  <button type="button" className={form.emailNotifications ? 'settings-toggle is-on' : 'settings-toggle'} onClick={() => updateField('emailNotifications', !form.emailNotifications)} aria-label="Toggle contact email notifications">
+                    <span className="settings-toggle-thumb" />
+                  </button>
+                </div>
+                <div className="settings-toggle-row settings-span-2">
+                  <div>
+                    <strong>Maintenance mode</strong>
+                    <p>Hide the public portfolio and show a custom maintenance banner.</p>
+                  </div>
+                  <button type="button" className={form.maintenanceMode ? 'settings-toggle is-on' : 'settings-toggle'} onClick={() => updateField('maintenanceMode', !form.maintenanceMode)} aria-label="Toggle maintenance mode">
+                    <span className="settings-toggle-thumb" />
+                  </button>
+                </div>
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="maintenanceMessage">Maintenance banner message</label>
+                  <textarea id="maintenanceMessage" className="form-control" rows={3} value={form.maintenanceMessage || ''} onChange={(event) => updateField('maintenanceMessage', event.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {section === 'appearance' && (
+          <div className="settings-stack">
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Theme preferences</h2>
+              </div>
+              <div className="settings-grid">
+                <div className="settings-span-2">
+                  <label className="form-label">Default theme</label>
+                  <div className="settings-segment">
+                    {['dark', 'light', 'system'].map((option) => (
+                      <button key={option} type="button" className={form.defaultTheme === option ? 'settings-segment-button active' : 'settings-segment-button'} onClick={() => updateField('defaultTheme', option)}>
+                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="settings-span-2">
+                  <label className="form-label">Accent color</label>
+                  <div className="settings-color-picker">
+                    {accentOptions.map((color) => (
+                      <button key={color} type="button" className={form.accentColor === color ? 'settings-color-swatch active' : 'settings-color-swatch'} style={{ background: color }} onClick={() => updateField('accentColor', color)} aria-label={`Set accent color ${color}`} />
+                    ))}
+                    <label className="settings-color-custom">
+                      <span>Custom</span>
+                      <input type="color" value={form.accentColor || '#d87968'} onChange={(event) => updateField('accentColor', event.target.value)} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {section === 'data' && (
+          <div className="settings-stack">
+            <div className="settings-panel">
+              <div className="settings-panel-header">
+                <h2>Analytics & resume</h2>
+              </div>
+              <div className="settings-grid">
+                <div className="mb-3 settings-span-2">
+                  <label className="form-label" htmlFor="analyticsId">Analytics tracking ID</label>
+                  <input id="analyticsId" className="form-control" value={form.analyticsId || ''} onChange={(event) => updateField('analyticsId', event.target.value)} placeholder="G-XXXXXXX or Vercel token" />
+                </div>
+                <div className="settings-span-2">
+                  <label className="form-label">Resume / CV</label>
+                  <div className="settings-upload-card">
+                    <div>
+                      <strong>Current file</strong>
+                      <p>{form.resumeFileName || 'No file selected yet'}</p>
+                    </div>
+                    <span>{form.resumeUpdatedAt ? new Date(form.resumeUpdatedAt).toLocaleDateString() : 'Not updated'}</span>
+                    <label className="btn btn-outline-primary mt-3" htmlFor="resumeUpload">Replace PDF</label>
+                    <input id="resumeUpload" type="file" accept=".pdf" hidden onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      updateField('resumeFileName', file.name);
+                      updateField('resumeUpdatedAt', new Date().toISOString());
+                    }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>}
+
+    {!loading && <div className="d-flex justify-content-end mt-4">
+      <button className="btn btn-primary" type="button" onClick={saveSettings} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+    </div>}
+  </section>;
+}
+
 function ContentManager({ page }) {
   const config = schemas[page];
   const objectConfig = objectSchemas[page];
@@ -440,7 +810,7 @@ export default function AdminDashboard() {
       <nav className="admin-sidebar" aria-label="Admin navigation">{navigation.map(([label, section, icon]) => <Link key={section} className={page === section ? 'active' : ''} to={adminUrl(section)}><i className={`bi ${icon}`} aria-hidden="true" /><span>{label}</span></Link>)}</nav>
       <main className="admin-content">
         {logoutError && <p className="alert alert-warning" role="alert">{logoutError}</p>}
-        {page === 'overview' ? <AdminOverview /> : knownPage ? <ContentManager key={page} page={page} /> : <section><h1 className="h2">Page not found</h1><Link to={adminUrl('overview')}>Return to overview</Link></section>}
+        {page === 'overview' ? <AdminOverview /> : page === 'settings' ? <SettingsManager /> : knownPage ? <ContentManager key={page} page={page} /> : <section><h1 className="h2">Page not found</h1><Link to={adminUrl('overview')}>Return to overview</Link></section>}
       </main>
     </div>
   </div>;

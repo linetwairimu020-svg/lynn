@@ -257,9 +257,18 @@ test('protected singleton and social-link APIs persist settings and visibility',
   const settings = await mutateWithCsrf('/api/admin/settings', 'PUT', {
     siteTitle: 'Updated Lynn Portfolio',
     notice: 'Saved through the API.',
+    defaultMetaDescription: 'Designer and developer crafting thoughtful digital experiences.',
+    defaultTheme: 'dark',
+    accentColor: '#d87968',
+    contactEmail: 'hello@example.com',
+    emailNotifications: true,
+    maintenanceMode: false,
+    maintenanceMessage: 'Scheduled maintenance in progress.',
+    analyticsId: 'G-123456789',
   }, adminJar);
   assert.equal(settings.response.status, 200);
   assert.equal((await request('/api/content/settings')).body.content.siteTitle, 'Updated Lynn Portfolio');
+  assert.equal((await request('/api/content/settings')).body.content.defaultTheme, 'dark');
 
   const created = await postWithCsrf('/api/admin/social-links', {
     platform: 'example-social',

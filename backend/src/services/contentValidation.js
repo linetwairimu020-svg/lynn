@@ -101,18 +101,62 @@ export function validateCollectionInput(collection, body) {
 }
 
 export function validateSingletonInput(name, body) {
+  const profileFields = ['name', 'headline', 'summary', 'about', 'location', 'email', 'phone'];
+  const settingsFields = [
+    'siteTitle', 'notice', 'seoTitle', 'defaultMetaDescription', 'ogImageUrl',
+    'adminDisplayName', 'adminEmail', 'adminUsername', 'contactEmail',
+    'emailNotifications', 'maintenanceMode', 'maintenanceMessage', 'defaultTheme',
+    'accentColor', 'twoFactorEnabled', 'analyticsId', 'resumeFileName', 'resumeUpdatedAt',
+  ];
   const fields = name === 'profile'
-    ? ['name', 'headline', 'summary', 'about', 'location', 'email', 'phone']
+    ? profileFields
     : name === 'settings'
-      ? ['siteTitle', 'notice']
+      ? settingsFields
       : null;
   if (!fields) throw new HttpError(404, 'CONTENT_NOT_FOUND', 'The requested content item does not exist.');
-  checkKeys(body, fields, fields.filter((field) => field !== 'location' && field !== 'phone'));
+  checkKeys(body, fields, name === 'profile' ? profileFields.filter((field) => field !== 'location' && field !== 'phone') : ['siteTitle']);
   const value = {};
+
   for (const field of fields) {
-    const required = field !== 'location' && field !== 'phone';
-    value[field] = cleanText(body[field] ?? '', field, { required, max: field === 'about' || field === 'summary' ? 5000 : 250 });
+    if (name === 'profile') {
+      const required = field !== 'location' && field !== 'phone';
+      value[field] = cleanText(body[field] ?? '', field, { required, max: field === 'about' || field === 'summary' ? 5000 : 250 });
+    } else if (field === 'siteTitle' || field === 'notice' || field === 'seoTitle' || field === 'defaultMetaDescription' || field === 'maintenanceMessage' || field === 'adminDisplayName' || field === 'adminUsername' || field === 'resumeFileName' || field === 'resumeUpdatedAt' || field === 'analyticsId' || field === 'contactEmail' || field === 'adminEmail' || field === 'defaultTheme' || field === 'accentColor' || field === 'ogImageUrl') {
+      if (field === 'ogImageUrl') {
+        value[field] = optionalUrl(body[field] ?? '', field);
+      } else if (field === 'defaultTheme') {
+        const rawTheme = body[field];
+        const safeTheme = typeof rawTheme === 'string'
+          ? rawTheme.trim().toLowerCase()
+          : typeof rawTheme === 'boolean'
+            ? rawTheme ? 'dark' : 'light'
+            : '';
+        const normalizedTheme = safeTheme === 'system preference' ? 'system' : safeTheme;
+        if (!normalizedTheme) {
+          value[field] = 'system';
+        } else if (['dark', 'light', 'system'].includes(normalizedTheme)) {
+          value[field] = normalizedTheme;
+        } else {
+          invalid('Default theme must be dark, light, or system.');
+        }
+      } else if (field === 'accentColor') {
+        const safeColor = cleanText(body[field] ?? '', field, { required: false, max: 32 });
+        if (safeColor && !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(safeColor)) invalid('Accent color must be a valid hex color.');
+        value[field] = safeColor;
+      } else if (field === 'contactEmail' || field === 'adminEmail') {
+        const email = cleanText(body[field] ?? '', field, { required: false, max: 254 });
+        if (email && !emailPattern.test(email)) invalid(`${field} must be a valid email address.`);
+        value[field] = email;
+      } else {
+        const required = field === 'siteTitle';
+        const max = field === 'maintenanceMessage' || field === 'defaultMetaDescription' ? 500 : 250;
+        value[field] = cleanText(body[field] ?? '', field, { required, max });
+      }
+    } else if (['emailNotifications', 'maintenanceMode', 'twoFactorEnabled'].includes(field)) {
+      value[field] = optionalBoolean(body[field], field, false);
+    }
   }
+
   if (name === 'profile' && !emailPattern.test(value.email)) invalid('Email must be a valid email address.');
   return value;
 }
